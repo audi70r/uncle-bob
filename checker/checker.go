@@ -28,7 +28,7 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 
 					switch strict {
 					case true:
-						if contains(packageLevels[a], pkgImport) && i >= a {
+						if contains(packageLevels[a], pkgImport) && i <= a {
 							errMsg := fmt.Sprintf("%v", "importing of a lower level or similar level package")
 							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(pkgImport, ModPath), a, strings.Trim(packageMap[pkg].Path, ModPath))
 							if !containsInCheckResults(results, errMsg) {
@@ -37,7 +37,7 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 							}
 						}
 					default:
-						if contains(packageLevels[a], pkgImport) && i > a {
+						if contains(packageLevels[a], pkgImport) && i < a {
 							errMsg := fmt.Sprintf("%v", "importing of a lower level package")
 							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(pkgImport, ModPath), a, strings.Trim(packageMap[pkg].Path, ModPath))
 							if !containsInCheckResults(results, errMsg) {
@@ -76,6 +76,7 @@ func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []
 
 	// get package dir
 	packagePath := workdir + strings.TrimPrefix(packageName, ModPath)
+	packagePath = strings.Trim(packagePath, `"`)
 
 	filepath.Walk(packagePath, func(path string, info os.FileInfo, err error) error {
 		// log and skip if error is not nil
@@ -109,8 +110,10 @@ func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []
 		}
 
 		for _, fileImport := range fileImports {
-			msg = fmt.Sprintf("%v <-- %v", msg, fileImport)
+			msg = fmt.Sprintf("%v\n<-- %v", msg, fileImport)
 		}
+
+		msg = fmt.Sprintf("%v \n\n", msg)
 
 		results = append(results, clog.NewInfo(msg))
 
