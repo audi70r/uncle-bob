@@ -30,7 +30,9 @@ func PrintAA() {
 func main() {
 	PrintAA()
 
-	strictFlag := flag.Bool("s", false, "do strict checking, do not allow same level imports")
+	fileImports := flag.String("package-imports", "", "show detailed information about package imports")
+	strictFlag := flag.Bool("strict", false, "do strict checking, do not allow same level imports")
+	ignoreTests := flag.Bool("ignore-tests", false, "ignore imports of test files")
 
 	flag.Parse()
 
@@ -40,7 +42,19 @@ func main() {
 	}
 
 	checker.LocateGoMod(workDir)
-	packageMap, mapResults := checker.Map(workDir)
+
+	if *fileImports != "" {
+		clog.Info("Package: " + *fileImports)
+		packageimportsInfo := checker.DisplayPackageInfo(workDir, *fileImports, *ignoreTests)
+
+		for _, v := range packageimportsInfo {
+			clog.PrintColorMessage(v)
+		}
+
+		return
+	}
+
+	packageMap, mapResults := checker.Map(workDir, *ignoreTests)
 
 	packageLevels := checker.SetUniqueLevels(packageMap)
 

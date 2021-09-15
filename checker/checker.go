@@ -71,6 +71,55 @@ func LevelsInfo(packageLevels [][]string) []clog.CheckResult {
 	return results
 }
 
+func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
+	var results []clog.CheckResult
+
+	// get package dir
+	packagePath := workdir + strings.TrimPrefix(packageName, ModPath)
+
+	filepath.Walk(packagePath, func(path string, info os.FileInfo, err error) error {
+		// log and skip if error is not nil
+		if err != nil {
+			results = append(results, clog.NewError(err.Error()))
+			return nil
+		}
+
+		// skip directories, non go files and other invalid filenames
+		if info.IsDir() || (len(info.Name()) > 3 && info.Name()[len(info.Name())-3:] != ".go") {
+			return nil
+		}
+
+		dirString, fileString := filepath.Split(path)
+
+		if strings.Contains(dirString, "/.git/") {
+			return nil
+		}
+
+		if ignoreTests && strings.HasSuffix(fileString, "_test.go") {
+			return nil
+		}
+
+		msg := fmt.Sprintf("file: %v \n imports: \n", info.Name())
+
+		fileImports, err := getImportsForFile(path)
+
+		if err != nil {
+			results = append(results, clog.NewError(err.Error()))
+			return nil
+		}
+
+		for _, fileImport := range fileImports {
+			msg = fmt.Sprintf("%v <-- %v", msg, fileImport)
+		}
+
+		results = append(results, clog.NewInfo(msg))
+
+		return nil
+	})
+
+	return results
+}
+
 func SetUniqueLevels(packageMap map[string]PackageInfo) [][]string {
 	var topLevelPackages []string
 
@@ -162,7 +211,7 @@ func SetLevels(packageMap map[string]PackageInfo) [][]string {
 	return packagesByLevel
 }
 
-func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
+func Map(workdir string, ignoreTests bool) (map[string]PackageInfo, []clog.CheckResult) {
 	var results []clog.CheckResult
 
 	PackageMap := make(map[string]PackageInfo)
@@ -179,7 +228,15 @@ func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
 			return nil
 		}
 
-		_, fileString := filepath.Split(path)
+		dirString, fileString := filepath.Split(path)
+
+		if strings.Contains(dirString, "/.git/") {
+			return nil
+		}
+
+		if ignoreTests && strings.HasSuffix(fileString, "_test.go") {
+			return nil
+		}
 
 		relPath, err := filepath.Rel(workdir, path)
 
