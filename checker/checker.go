@@ -1,17 +1,84 @@
 package checker
 
 import (
+	"fmt"
 	"github.com/audi70r/go-archangel/utilities/clog"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type PackageInfo struct {
 	Path    string
 	Files   []string
 	Imports []string
+	Level   int
+}
+
+// check if a package imports another package of a higher of similar level and throw a error result
+func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string) []clog.CheckResult {
+	var results []clog.CheckResult
+
+	for i := len(packageLevels) - 1; i >= 0; i-- {
+		for _, pkg := range packageLevels[i] {
+			for _, pkgImport := range packageMap[pkg].Imports {
+				for a := i; a >= 0; a-- {
+					if contains(packageLevels[a], pkgImport) {
+						errMsg := fmt.Sprintf("%v is imported by a lower or similar level package %v", pkgImport, packageMap[pkg].Path)
+						if !containsInCheckResults(results, errMsg) {
+							results = append(results, clog.NewWarning(errMsg))
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return results
+}
+
+func SetLevels(packageMap map[string]PackageInfo) [][]string {
+	var topLevelPackages []string
+
+	// loop through all package imports of all packages
+	for _, packageInfo := range packageMap {
+		packageIsMentionedInImports := false
+
+		// find a package that is not imported by any other packages, usually main
+		for _, packageDetails := range packageMap {
+			if contains(packageDetails.Imports, packageInfo.Path) {
+				packageIsMentionedInImports = true
+			}
+		}
+		if !packageIsMentionedInImports {
+			topLevelPackages = append(topLevelPackages, packageInfo.Path)
+		}
+	}
+
+	packagesByLevel := make([][]string, 0)
+	packagesByLevel = append(packagesByLevel, topLevelPackages)
+
+	// loop through imports of packages and group them by import level
+	currentPackageLevel := 0
+	for len(packagesByLevel[currentPackageLevel]) > 0 {
+		packagesByLevel = append(packagesByLevel, make([]string, 0, 0))
+		for _, packagePath := range packagesByLevel[currentPackageLevel] {
+
+			if _, ok := packageMap[packagePath]; ok {
+				for _, packageImport := range packageMap[packagePath].Imports {
+					if !contains(packagesByLevel[currentPackageLevel+1], packageImport) {
+						packagesByLevel[currentPackageLevel+1] = append(packagesByLevel[currentPackageLevel+1], packageImport)
+					}
+				}
+			}
+		}
+
+		currentPackageLevel++
+	}
+
+	return packagesByLevel
 }
 
 func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
@@ -47,7 +114,7 @@ func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
 			return nil
 		}
 
-		packagePath := ModPath + "/" + filepath.Dir(relPath)
+		packagePath := fmt.Sprintf("%q", ModPath+"/"+filepath.Dir(relPath))
 
 		if _, ok := PackageMap[packagePath]; ok {
 			packageMapItem := PackageMap[packagePath]
@@ -56,7 +123,9 @@ func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
 			packageImports := packageMapItem.Imports
 
 			for _, packageImport := range fileImports {
-				packageImports = AppendStringIfMissing(packageImports, packageImport)
+				if strings.Index(packageImport, ModPath) > 0 {
+					packageImports = AppendStringIfMissing(packageImports, packageImport)
+				}
 			}
 
 			packageMapItem.Imports = packageImports
@@ -64,11 +133,21 @@ func Map(workdir string) (map[string]PackageInfo, []clog.CheckResult) {
 			return nil
 		}
 
-		PackageMap[packagePath] = PackageInfo{
-			Path:    packagePath,
-			Files:   []string{fileString},
-			Imports: fileImports,
+		packageInfo := PackageInfo{
+			Path:  packagePath,
+			Files: []string{fileString},
+			Level: 0,
 		}
+
+		var packageImports []string
+		for _, packageImport := range fileImports {
+			if strings.Index(packageImport, ModPath) > 0 {
+				packageImports = AppendStringIfMissing(packageImports, packageImport)
+			}
+		}
+
+		packageInfo.Imports = packageImports
+		PackageMap[packagePath] = packageInfo
 
 		return nil
 	})

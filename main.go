@@ -37,11 +37,15 @@ func main() {
 	checker.LocateGoMod(workDir)
 	packageMap, mapResults := checker.Map(workDir)
 
-	for _, v := range packageMap {
-		clog.Info(fmt.Sprintf("%+v\n", v))
-	}
+	packageLevels := checker.SetLevels(packageMap)
+
+	levelCheckResults := checker.CheckLevels(packageMap, packageLevels)
 
 	for _, v := range mapResults {
+		clog.PrintColorMessage(v)
+	}
+
+	for _, v := range levelCheckResults {
 		clog.PrintColorMessage(v)
 	}
 }

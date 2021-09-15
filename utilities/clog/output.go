@@ -8,7 +8,7 @@ type color string
 // CheckResult is the result of dependency checking
 type CheckResult struct {
 	resultType resultType
-	message    string
+	Message    string
 	color      color
 }
 
@@ -33,7 +33,7 @@ func Warning(msg string) {
 func NewError(msg string) CheckResult {
 	return CheckResult{
 		resultType: resultErr,
-		message:    msg,
+		Message:    msg,
 		color:      red,
 	}
 }
@@ -41,7 +41,7 @@ func NewError(msg string) CheckResult {
 func NewInfo(msg string) CheckResult {
 	return CheckResult{
 		resultType: resultInfo,
-		message:    msg,
+		Message:    msg,
 		color:      teal,
 	}
 }
@@ -49,11 +49,11 @@ func NewInfo(msg string) CheckResult {
 func NewWarning(msg string) CheckResult {
 	return CheckResult{
 		resultType: resultWarning,
-		message:    msg,
+		Message:    msg,
 		color:      yellow,
 	}
 }
 
 func PrintColorMessage(cr CheckResult) {
-	fmt.Printf("%s%-11s%s\n%s", cr.color, "["+cr.resultType+"]", cr.message, reset)
+	fmt.Printf("%s%-11s%s\n%s", cr.color, "["+cr.resultType+"]", cr.Message, reset)
 }
