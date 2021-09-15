@@ -30,7 +30,7 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 					case true:
 						if contains(packageLevels[a], pkgImport) && i <= a {
 							errMsg := fmt.Sprintf("%v", "importing of a lower level or similar level package")
-							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(pkgImport, ModPath), a, strings.Trim(packageMap[pkg].Path, ModPath))
+							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
 							if !containsInCheckResults(results, errMsg) {
 								results = append(results, clog.NewWarning(errMsg))
 								break
@@ -39,7 +39,7 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 					default:
 						if contains(packageLevels[a], pkgImport) && i < a {
 							errMsg := fmt.Sprintf("%v", "importing of a lower level package")
-							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(pkgImport, ModPath), a, strings.Trim(packageMap[pkg].Path, ModPath))
+							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
 							if !containsInCheckResults(results, errMsg) {
 								results = append(results, clog.NewWarning(errMsg))
 								break
@@ -50,6 +50,10 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 				}
 			}
 		}
+	}
+
+	for _, v := range results {
+		clog.PrintColorMessage(v)
 	}
 
 	return results
@@ -68,10 +72,15 @@ func LevelsInfo(packageLevels [][]string) []clog.CheckResult {
 		results = append(results, clog.NewInfo(msg))
 	}
 
+	for _, v := range results {
+		clog.PrintColorMessage(v)
+	}
+
 	return results
 }
 
 func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
+	clog.Info("Package: " + packageName)
 	var results []clog.CheckResult
 
 	// get package dir
@@ -119,6 +128,10 @@ func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []
 
 		return nil
 	})
+
+	for _, v := range results {
+		clog.PrintColorMessage(v)
+	}
 
 	return results
 }
@@ -292,6 +305,10 @@ func Map(workdir string, ignoreTests bool) (map[string]PackageInfo, []clog.Check
 
 		return nil
 	})
+
+	for _, v := range results {
+		clog.PrintColorMessage(v)
+	}
 
 	return PackageMap, results
 }

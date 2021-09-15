@@ -1,6 +1,8 @@
 package clog
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type resultType string
 type color string

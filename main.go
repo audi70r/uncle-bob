@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/audi70r/go-archangel/checker"
-	"github.com/audi70r/go-archangel/utilities/clog"
 	"log"
 	"os"
+
+	"github.com/audi70r/go-archangel/checker"
 )
 
 func PrintAA() {
@@ -44,33 +44,16 @@ func main() {
 	checker.LocateGoMod(workDir)
 
 	if *fileImports != "" {
-		clog.Info("Package: " + *fileImports)
-		packageimportsInfo := checker.DisplayPackageInfo(workDir, *fileImports, *ignoreTests)
-
-		for _, v := range packageimportsInfo {
-			clog.PrintColorMessage(v)
-		}
+		_ = checker.DisplayPackageInfo(workDir, *fileImports, *ignoreTests)
 
 		return
 	}
 
-	packageMap, mapResults := checker.Map(workDir, *ignoreTests)
+	packageMap, _ := checker.Map(workDir, *ignoreTests)
 
 	packageLevels := checker.SetUniqueLevels(packageMap)
 
-	levelsInfo := checker.LevelsInfo(packageLevels)
+	_ = checker.LevelsInfo(packageLevels)
 
-	levelCheckResults := checker.CheckLevels(packageMap, packageLevels, *strictFlag)
-
-	for _, v := range levelsInfo {
-		clog.PrintColorMessage(v)
-	}
-
-	for _, v := range mapResults {
-		clog.PrintColorMessage(v)
-	}
-
-	for _, v := range levelCheckResults {
-		clog.PrintColorMessage(v)
-	}
+	_ = checker.CheckLevels(packageMap, packageLevels, *strictFlag)
 }
