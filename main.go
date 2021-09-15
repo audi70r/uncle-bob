@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/audi70r/go-archangel/checker"
 	"github.com/audi70r/go-archangel/utilities/clog"
@@ -29,6 +30,10 @@ func PrintAA() {
 func main() {
 	PrintAA()
 
+	strictFlag := flag.Bool("s", false, "do strict checking, do not allow same level imports")
+
+	flag.Parse()
+
 	workDir, wrkDirErr := os.Getwd()
 	if wrkDirErr != nil {
 		log.Println(wrkDirErr)
@@ -37,9 +42,15 @@ func main() {
 	checker.LocateGoMod(workDir)
 	packageMap, mapResults := checker.Map(workDir)
 
-	packageLevels := checker.SetLevels(packageMap)
+	packageLevels := checker.SetUniqueLevels(packageMap)
 
-	levelCheckResults := checker.CheckLevels(packageMap, packageLevels)
+	levelsInfo := checker.LevelsInfo(packageLevels)
+
+	levelCheckResults := checker.CheckLevels(packageMap, packageLevels, *strictFlag)
+
+	for _, v := range levelsInfo {
+		clog.PrintColorMessage(v)
+	}
 
 	for _, v := range mapResults {
 		clog.PrintColorMessage(v)
