@@ -6,20 +6,16 @@ import (
 	"log"
 	"os"
 
-	"github.com/audi70r/go-archangel/checker"
+	"github.com/audi70r/uncle-bob/checker"
 )
 
 func PrintAA() {
 	aa := []string{
-		`   _____                        _                            _ `,
-		`  / ____|        /\            | |                          | |`,
-		` | |  __  ___   /  \   _ __ ___| |__   __ _ _ __   __ _  ___| |`,
-		` | | |_ |/ _ \ / /\ \ | '__/ __| '_ \ / _  | '_ \ / _  |/ _ \ |`,
-		` | |__| | (_) / ____ \| | | (__| | | | (_| | | | | (_| |  __/ |`,
-		`  \_____|\___/_/    \_\_|  \___|_| |_|\__,_|_| |_|\__, |\___|_|`,
-		`                                                   __/ |       `,
-		`                                                  |___/        `,
-		`v1.0                                      by Dmitri Beltjukov  `,
+		` /\ /\ _ __   ___| | ___    / __\ ___ | |__  `,
+		`/ / \ \ '_ \ / __| |/ _ \  /__\/// _ \| '_ \ `,
+		`\ \_/ / | | | (__| |  __/ / \/  \ (_) | |_) |`,
+		` \___/|_| |_|\___|_|\___| \_____/\___/|_.__/ `,
+		`v1.0                         dmitri@nuage.ee `,
 	}
 	for _, s := range aa {
 		fmt.Println(s)
@@ -53,7 +49,14 @@ func main() {
 
 	packageLevels := checker.SetUniqueLevels(packageMap)
 
-	_ = checker.LevelsInfo(packageLevels)
+	checker.LevelsInfo(packageLevels)
 
-	_ = checker.CheckLevels(packageMap, packageLevels, *strictFlag)
+	checker.CheckLevels(packageMap, packageLevels, *strictFlag)
+
+	if checker.UncleBobIsSad {
+		fmt.Println("Issues detected, Uncle Bob is Sad :(")
+		os.Exit(1)
+	}
+
+	fmt.Println("Well done, Uncle Bob is Proud :)")
 }

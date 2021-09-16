@@ -1,7 +1,7 @@
 package checker
 
 import (
-	"github.com/audi70r/go-archangel/utilities/clog"
+	"github.com/audi70r/uncle-bob/utilities/clog"
 	"golang.org/x/mod/modfile"
 	"os"
 )

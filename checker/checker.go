@@ -2,7 +2,7 @@ package checker
 
 import (
 	"fmt"
-	"github.com/audi70r/go-archangel/utilities/clog"
+	"github.com/audi70r/uncle-bob/utilities/clog"
 	"go/parser"
 	"go/token"
 	"os"
@@ -17,8 +17,10 @@ type PackageInfo struct {
 	Level   int
 }
 
+var UncleBobIsSad bool
+
 // check if a package imports another package of a higher of similar level and throw a error result
-func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, strict bool) []clog.CheckResult {
+func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, strict bool) {
 	var results []clog.CheckResult
 
 	for i := len(packageLevels) - 1; i >= 0; i-- {
@@ -28,19 +30,21 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 
 					switch strict {
 					case true:
-						if contains(packageLevels[a], pkgImport) && i <= a {
-							errMsg := fmt.Sprintf("%v", "importing of a lower level or similar level package")
+						if contains(packageLevels[a], pkgImport) && i-1 != a {
+							errMsg := fmt.Sprintf("%v", "Only one level inward importing is allowed")
 							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
 							if !containsInCheckResults(results, errMsg) {
+								UncleBobIsSad = true
 								results = append(results, clog.NewWarning(errMsg))
 								break
 							}
 						}
 					default:
-						if contains(packageLevels[a], pkgImport) && i < a {
-							errMsg := fmt.Sprintf("%v", "importing of a lower level package")
+						if contains(packageLevels[a], pkgImport) && i <= a {
+							errMsg := fmt.Sprintf("%v", "Importing a package of the same level is not allowed")
 							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
 							if !containsInCheckResults(results, errMsg) {
+								UncleBobIsSad = true
 								results = append(results, clog.NewWarning(errMsg))
 								break
 							}
@@ -55,11 +59,9 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 	for _, v := range results {
 		clog.PrintColorMessage(v)
 	}
-
-	return results
 }
 
-func LevelsInfo(packageLevels [][]string) []clog.CheckResult {
+func LevelsInfo(packageLevels [][]string) {
 	var results []clog.CheckResult
 
 	for lvl, packageLevel := range packageLevels {
@@ -75,8 +77,6 @@ func LevelsInfo(packageLevels [][]string) []clog.CheckResult {
 	for _, v := range results {
 		clog.PrintColorMessage(v)
 	}
-
-	return results
 }
 
 func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
