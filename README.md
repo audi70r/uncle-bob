@@ -1,7 +1,7 @@
 ##Uncle-bob
 Golang clean architecture linter
 
-<img src="https://habrastorage.org/files/938/553/6f2/9385536f2f3649fdba1cf361dce6480a.jpg" width="700" height="400">
+![uncle bob](https://habrastorage.org/files/938/553/6f2/9385536f2f3649fdba1cf361dce6480a.jpg)
 
 ##Description
 
@@ -30,6 +30,8 @@ where the go.mod is located and simply run
 ```bash
 $ uncle-bob
 ```
+
+![uncle bob](uncle-bob-example.png)
 
 Usage of uncle-bob:
 
