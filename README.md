@@ -1,9 +1,9 @@
-#Uncle-bob
+##Uncle-bob
 Golang clean architecture linter
 
 <img src="https://habrastorage.org/files/938/553/6f2/9385536f2f3649fdba1cf361dce6480a.jpg" width="700" height="400">
 
-#Description
+##Description
 
 A golang linter based on Uncle Bob's clean code concepts.
 
@@ -13,7 +13,7 @@ levels are defined as
 
 Linter works go mod enabled
 
-#Usage
+##Usage
 
 Build the project
 ```bash
@@ -46,5 +46,5 @@ $ uncle-bob -package-imports=github.com/audi70r/uncle-bob/checker
 
 -strict - do strict checking, allow only one level inward imports
 
-#License
+##License
 Do whatever you want with it, but don't disrespect Uncle Bob!
