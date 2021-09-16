@@ -9,9 +9,16 @@ A golang linter based on Uncle Bob's clean code concepts.
 
 The linter builds a hierarchical model from the project directory AST and assign a level for every 
 package used by the project (with the exception of a standart golang library). The dependency 
-levels are defined as 
+levels are defined by the imports of a higher order package. If main package is considered level 0, then
+all of its import will be 1. The subsequent imports of level 1 packages are respectively level 2 etc.
 
-Linter works go mod enabled
+In plain mod, Uncle Bob will not allow same level imports.
+
+In strict mod, Uncle Bob will only allow one level inward import (ex. level 0 can only import level 1 packages, level 1 can only import level 2 etc...)
+
+Can by used in pipelines. If an issue is detected Uncle Bob will exit with status 1.
+
+Linter works with go mod enabled
 
 # Usage
 
