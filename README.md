@@ -46,7 +46,10 @@ show detailed information about package imports
 $ uncle-bob -package-imports=github.com/audi70r/uncle-bob/checker
 ``` 
 
--strict - do strict checking, allow only one level inward imports
+do strict checking, allow only one level inward imports
+```bash
+$ uncle-bob -strict
+``` 
 
 # License
 Do whatever you want with it, but don't disrespect Uncle Bob!
