@@ -1,7 +1,7 @@
 # Uncle-bob
 Golang clean architecture linter
 
-![uncle bob](https://habrastorage.org/files/938/553/6f2/9385536f2f3649fdba1cf361dce6480a.jpg)
+![uncle bob](https://miro.medium.com/max/1400/1*nky1uZpFvkELX3RRC8tQSw.jpeg)
 
 # Description
 
