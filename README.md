@@ -40,23 +40,60 @@ $ uncle-bob
 
 ![uncle bob](uncle-bob-example.png)
 
-Usage of uncle-bob:
-
+## Basic Commands
 
 To ignore test files
 ```bash
 $ uncle-bob -ignore-tests
 ```
 
-show detailed information about package imports
+Show detailed information about package imports
 ```bash
 $ uncle-bob -package-imports=github.com/audi70r/uncle-bob/checker
 ``` 
 
-do strict checking, allow only one level inward imports
+Do strict checking, allow only one level inward imports
 ```bash
 $ uncle-bob -strict
-``` 
+```
+
+## Visualizations
+
+Uncle Bob provides multiple visualization options to help understand your project's architecture.
+
+### GraphViz DOT Output
+
+Generate a dependency graph in DOT format (can be used with GraphViz tools)
+```bash
+$ uncle-bob -dot > deps.dot
+```
+
+### HTML Visualization
+
+Generate an interactive HTML report showing package dependencies
+```bash
+$ uncle-bob -html=report.html
+```
+
+### 3D Building Visualization
+
+Generate an immersive 3D visualization of your package architecture as a building structure
+```bash
+$ uncle-bob -3d=architecture.html
+```
+
+The 3D visualization represents your architecture as a building with:
+- Each floor representing a level in Clean Architecture
+- Packages displayed as rooms on each floor
+- Dependencies shown as connections between packages
+- Different colors for entry points, utilities, and regular packages
+- Red connections highlighting violations
+
+Interactive controls:
+- Rotate, pan and zoom to explore the structure
+- View dependencies and violations
+- Toggle exploded view to see each level separately
+- Reset view to return to the default perspective
 
 # License
 Do whatever you want with it, but don't disrespect Uncle Bob!
