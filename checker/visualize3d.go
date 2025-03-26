@@ -418,8 +418,7 @@ const threejsTemplate = `<!DOCTYPE html>
     </div>
     
     <div id="dragHandle" class="drag-handle">
-        <span style="font-size: 28px;">⬌</span><br>
-        <span style="font-size: 12px;">MOVE</span>
+        <span style="font-size: 28px;">⬌</span>
     </div>
     
     <div class="legend">
@@ -449,7 +448,7 @@ const threejsTemplate = `<!DOCTYPE html>
     <div id="controls">
         <h3>View Controls</h3>
         <button id="toggleDependencies">Show Dependencies</button>
-        <button id="toggleViolationsOnly">Show Violations Only</button>
+        <button id="toggleViolationsOnly">Show Violations</button>
         <button id="explodeView">Explode View</button>
         <button id="resetView">Reset View</button>
     </div>
@@ -592,8 +591,9 @@ const threejsTemplate = `<!DOCTYPE html>
 
         // Create the building foundation
         function createFoundation() {
+            // Create a wider foundation 
             const foundationGeometry = new THREE.BoxGeometry(
-                30, 1, 30
+                40, 1, 40
             );
             const foundationMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0x2d00f7, // Deep electric blue
@@ -652,7 +652,8 @@ const threejsTemplate = `<!DOCTYPE html>
                 const floorY = floorBaseY + index * normalFloorSpacing;
                 
                 // Create floor
-                const floorGeometry = new THREE.BoxGeometry(20, floorHeight, 20);
+                // Create wider floors
+                const floorGeometry = new THREE.BoxGeometry(30, floorHeight, 30);
                 const floorMaterial = new THREE.MeshStandardMaterial({ 
                     color: getFloorColor(index),
                     transparent: true,
@@ -948,7 +949,20 @@ const threejsTemplate = `<!DOCTYPE html>
         // Toggle showing only violations
         function toggleViolationsOnly() {
             showViolationsOnly = !showViolationsOnly;
+            
+            // If enabling violations mode, also enable dependencies if they're not already enabled
+            if (showViolationsOnly && !showDependencies) {
+                showDependencies = true;
+                // Update dependency button text
+                const depButton = document.getElementById('toggleDependencies');
+                depButton.textContent = 'Hide Dependencies';
+            }
+            
             updateDependencyVisibility();
+            
+            // Update button text
+            const button = document.getElementById('toggleViolationsOnly');
+            button.textContent = showViolationsOnly ? 'Show All Dependencies' : 'Show Violations';
         }
         
         // Update which dependencies are visible based on current settings
