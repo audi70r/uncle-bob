@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	AppVersion = "1.2.0"
+	AppVersion = "1.4.0"
 	AppAuthor  = "dmitri@nuage.ee"
 )
 
@@ -41,6 +41,11 @@ func main() {
 	noColorFlag := flag.Bool("no-color", false, "Disable colored output")
 	versionFlag := flag.Bool("version", false, "Show version information")
 
+	// Visualization options
+	dotFlag := flag.Bool("dot", false, "Output dependency graph in GraphViz DOT format")
+	htmlFlag := flag.String("html", "", "Generate HTML visualization (specify output file path)")
+	building3dFlag := flag.String("3d", "", "Generate 3D building visualization (specify output file path)")
+
 	// Parse command line flags
 	flag.Parse()
 
@@ -62,6 +67,11 @@ func main() {
 		fmt.Println("  uncle-bob -path=/path/to/project    # Check specific directory")
 		fmt.Println("  uncle-bob -strict                   # Use strict mode (only allows one level inward imports)")
 		fmt.Println("  uncle-bob -package-imports=\"pkg/foo\" # Show imports for a specific package")
+
+		fmt.Println("\nVisualizations:")
+		fmt.Println("  uncle-bob -dot > deps.dot           # Generate GraphViz DOT file")
+		fmt.Println("  uncle-bob -html=report.html         # Generate HTML visualization")
+		fmt.Println("  uncle-bob -3d=building.html         # Generate 3D building visualization")
 		return
 	}
 
@@ -143,7 +153,37 @@ func main() {
 	// Generate package levels
 	packageLevels := checker.SetUniqueLevels(packageMap)
 
-	// Display package level information
+	// Handle visualization options
+	if *dotFlag {
+		// Generate DOT graph and output to stdout
+		fmt.Println(checker.GenerateDotGraph(packageMap, packageLevels))
+		return
+	}
+
+	if *htmlFlag != "" {
+		// Generate HTML report
+		err := checker.GenerateHTMLReport(packageMap, packageLevels, *htmlFlag)
+		if err != nil {
+			clog.Error(fmt.Sprintf("Failed to generate HTML report: %s", err.Error()))
+			os.Exit(1)
+		}
+		clog.Info(fmt.Sprintf("HTML report generated: %s", *htmlFlag))
+		return
+	}
+
+	if *building3dFlag != "" {
+		// Generate 3D building visualization
+		err := checker.Generate3DVisualization(packageMap, packageLevels, *building3dFlag)
+		if err != nil {
+			clog.Error(fmt.Sprintf("Failed to generate 3D visualization: %s", err.Error()))
+			os.Exit(1)
+		}
+		clog.Info(fmt.Sprintf("3D visualization generated: %s", *building3dFlag))
+		clog.Info("Open the file in a browser to view the interactive visualization")
+		return
+	}
+
+	// Standard text output - Display package level information
 	checker.LevelsInfo(packageLevels)
 
 	// Check for violations

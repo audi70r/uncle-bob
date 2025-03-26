@@ -126,10 +126,10 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 
 // CleanArchitectureLayers contains descriptions of layers in Clean Architecture
 var CleanArchitectureLayers = []string{
-	"Frameworks & Drivers (outermost layer)",
-	"Interface Adapters",
-	"Application Business Rules",
-	"Enterprise Business Rules (innermost layer)",
+	"Level 1",
+	"Level 2",
+	"Level 3",
+	"Level 4",
 }
 
 // LevelsInfo displays information about package levels with Clean Architecture context
@@ -160,13 +160,13 @@ func LevelsInfo(packageLevels [][]string) {
 			var layerSymbol string
 			switch i {
 			case 0:
-				layerSymbol = "🌐" // UI/Web/External interfaces
+				layerSymbol = "📦" // Entities/Domain models (innermost)
 			case 1:
-				layerSymbol = "🔌" // Adapters/Controllers
-			case 2:
 				layerSymbol = "⚙️" // Use Cases/Application logic
+			case 2:
+				layerSymbol = "🔌" // Adapters/Controllers
 			case 3:
-				layerSymbol = "📦" // Entities/Domain models
+				layerSymbol = "🌐" // UI/Web/External interfaces (outermost)
 			default:
 				layerSymbol = "•"
 			}
@@ -189,19 +189,23 @@ func LevelsInfo(packageLevels [][]string) {
 	footerMsg := "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 	clog.PrintColorMessage(clog.NewInfo(footerMsg))
 
-	for lvl, packageLevel := range packageLevels {
+	// Reverse the order to display utility packages at the bottom (deeper levels)
+	// In Clean Architecture, higher numbers should represent deeper, more fundamental layers
+	for i := len(packageLevels) - 1; i >= 0; i-- {
+		packageLevel := packageLevels[i]
 		if len(packageLevel) == 0 {
 			continue
 		}
 
-		// Determine if this level aligns with a Clean Architecture layer
+		// Map the reversed level to Clean Architecture layer
+		caIndex := len(packageLevels) - i - 1
 		layerInfo := ""
-		if lvl < len(CleanArchitectureLayers) {
-			layerInfo = fmt.Sprintf(" ~ %s", CleanArchitectureLayers[lvl])
+		if caIndex < len(CleanArchitectureLayers) {
+			layerInfo = fmt.Sprintf(" ~ %s", CleanArchitectureLayers[caIndex])
 		}
 
 		// Use a visual separator between levels
-		if lvl > 0 {
+		if i < len(packageLevels)-1 {
 			separatorMsg := "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 			sepResult := clog.NewInfo(separatorMsg)
 			clog.PrintColorMessage(sepResult)
@@ -209,9 +213,9 @@ func LevelsInfo(packageLevels [][]string) {
 
 		// Add emoji for the level to make it visually distinct
 		var levelEmoji string
-		switch lvl {
+		switch i {
 		case 0:
-			levelEmoji = "🔝" // Top level
+			levelEmoji = "🔝" // Top level in display (but actually highest dependency level)
 		case 1:
 			levelEmoji = "🔼" // High level
 		case 2:
@@ -222,7 +226,9 @@ func LevelsInfo(packageLevels [][]string) {
 			levelEmoji = "⏬" // Lowest levels
 		}
 
-		msg := fmt.Sprintf("%s Level %d%s packages:", levelEmoji, lvl, layerInfo)
+		// Use the real architectural level for display - higher numbers are deeper layers
+		displayLevel := len(packageLevels) - i - 1
+		msg := fmt.Sprintf("%s Level %d%s packages:", levelEmoji, displayLevel, layerInfo)
 		result := clog.NewInfo(msg)
 		clog.PrintColorMessage(result)
 
