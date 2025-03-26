@@ -3,60 +3,117 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 
 	"github.com/audi70r/uncle-bob/checker"
+	"github.com/audi70r/uncle-bob/utilities/clog"
 )
 
-func PrintAA() {
-	aa := []string{
+const (
+	AppVersion = "1.1.0"
+	AppAuthor  = "dmitri@nuage.ee"
+)
+
+// printLogo prints the application logo
+func printLogo() {
+	logo := []string{
 		` /\ /\ _ __   ___| | ___    / __\ ___ | |__  `,
 		`/ / \ \ '_ \ / __| |/ _ \  /__\/// _ \| '_ \ `,
 		`\ \_/ / | | | (__| |  __/ / \/  \ (_) | |_) |`,
 		` \___/|_| |_|\___|_|\___| \_____/\___/|_.__/ `,
-		`v1.0                         dmitri@nuage.ee `,
+		fmt.Sprintf(`v%s                         %s `, AppVersion, AppAuthor),
 	}
-	for _, s := range aa {
-		fmt.Println(s)
-	}
+
+	fmt.Println(string(clog.Blue) + strings.Join(logo, "\n") + string(clog.Reset))
 	fmt.Println("")
 }
 
 func main() {
-	PrintAA()
+	// Define command line flags
+	fileImports := flag.String("package-imports", "", "Show detailed information about package imports")
+	strictFlag := flag.Bool("strict", false, "Do strict checking, allow only one level inward imports")
+	ignoreTests := flag.Bool("ignore-tests", false, "Ignore imports of test files")
+	quietFlag := flag.Bool("quiet", false, "Only show warnings and errors")
+	silentFlag := flag.Bool("silent", false, "Only show errors")
+	noColorFlag := flag.Bool("no-color", false, "Disable colored output")
+	versionFlag := flag.Bool("version", false, "Show version information")
 
-	fileImports := flag.String("package-imports", "", "show detailed information about package imports")
-	strictFlag := flag.Bool("strict", false, "do strict checking, do not allow same level imports")
-	ignoreTests := flag.Bool("ignore-tests", false, "ignore imports of test files")
-
+	// Parse command line flags
 	flag.Parse()
 
-	workDir, wrkDirErr := os.Getwd()
-	if wrkDirErr != nil {
-		log.Println(wrkDirErr)
-	}
-
-	checker.LocateGoMod(workDir)
-
-	if *fileImports != "" {
-		_ = checker.DisplayPackageInfo(workDir, *fileImports, *ignoreTests)
-
+	// Handle version flag
+	if *versionFlag {
+		fmt.Printf("Uncle Bob %s\n", AppVersion)
 		return
 	}
 
-	packageMap, _ := checker.Map(workDir, *ignoreTests)
+	// Configure logging
+	if *silentFlag {
+		clog.SetLogLevel(clog.LevelError)
+	} else if *quietFlag {
+		clog.SetLogLevel(clog.LevelWarning)
+	}
 
-	packageLevels := checker.SetUniqueLevels(packageMap)
+	// Configure color output
+	if *noColorFlag {
+		clog.DisableColor()
+	}
 
-	checker.LevelsInfo(packageLevels)
+	// Show the logo unless silent mode is enabled
+	if !*silentFlag {
+		printLogo()
+	}
 
-	checker.CheckLevels(packageMap, packageLevels, *strictFlag)
-
-	if checker.UncleBobIsSad {
-		fmt.Println("Issues detected, Uncle Bob is Sad :(")
+	// Get working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		clog.Error(fmt.Sprintf("Failed to get working directory: %s", err.Error()))
 		os.Exit(1)
 	}
 
-	fmt.Println("Well done, Uncle Bob is Proud :)")
+	// Locate go.mod file
+	checker.LocateGoMod(workDir)
+
+	// Handle package-imports flag
+	if *fileImports != "" {
+		results := checker.DisplayPackageInfo(workDir, *fileImports, *ignoreTests)
+
+		// Check if any errors occurred
+		for _, res := range results {
+			if res.Type == clog.ResultErr {
+				os.Exit(1)
+			}
+		}
+		return
+	}
+
+	// Generate package map
+	packageMap, results := checker.Map(workDir, *ignoreTests)
+
+	// Check if any errors occurred during mapping
+	for _, res := range results {
+		if res.Type == clog.ResultErr {
+			os.Exit(1)
+		}
+	}
+
+	// Generate package levels
+	packageLevels := checker.SetUniqueLevels(packageMap)
+
+	// Display package level information
+	checker.LevelsInfo(packageLevels)
+
+	// Check for violations
+	results = checker.CheckLevels(packageMap, packageLevels, *strictFlag)
+
+	// Output final result
+	if checker.HasViolations(results) {
+		clog.Error("Issues detected, Uncle Bob is Sad :(")
+		clog.Info("\nReview the suggestions above to fix architectural issues.")
+		clog.Info("For Clean Architecture principles, visit: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html")
+		os.Exit(1)
+	} else {
+		clog.Info("Well done, Uncle Bob is Proud :)")
+	}
 }

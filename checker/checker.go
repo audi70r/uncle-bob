@@ -2,133 +2,102 @@ package checker
 
 import (
 	"fmt"
-	"github.com/audi70r/uncle-bob/utilities/clog"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/audi70r/uncle-bob/utilities/clog"
 )
 
+// PackageInfo represents information about a Go package
 type PackageInfo struct {
-	Path    string
-	Files   []string
-	Imports []string
-	Level   int
+	Path    string   // Package import path
+	Files   []string // Go files in the package
+	Imports []string // Packages imported by this package
+	Level   int      // Dependency level (calculated later)
 }
 
-var UncleBobIsSad bool
+// HasViolations returns true if any violations were found
+func HasViolations(results []clog.CheckResult) bool {
+	for _, result := range results {
+		if result.Type == clog.ResultWarning {
+			return true
+		}
+	}
+	return false
+}
 
-// check if a package imports another package of a higher of similar level and throw a error result
-func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, strict bool) {
+// CheckLevels verifies package imports follow Clean Architecture rules
+// Returns a list of violations found with suggestions for fixes
+func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, strict bool) []clog.CheckResult {
 	var results []clog.CheckResult
 
 	for i := len(packageLevels) - 1; i >= 0; i-- {
 		for _, pkg := range packageLevels[i] {
+			// Skip entry point packages (like main) - they're allowed to import from any layer
+			if isEntryPointPackage(pkg) {
+				continue
+			}
+
 			for _, pkgImport := range packageMap[pkg].Imports {
 				for a := i; a >= 0; a-- {
+					var violation bool
+					var message string
+					var suggestion string
 
-					switch strict {
-					case true:
+					if strict {
+						// In strict mode, only allow importing packages from the next level down
 						if contains(packageLevels[a], pkgImport) && i-1 != a {
-							errMsg := fmt.Sprintf("%v", "Only one level inward importing is allowed")
-							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
-							if !containsInCheckResults(results, errMsg) {
-								UncleBobIsSad = true
-								results = append(results, clog.NewWarning(errMsg))
-								break
+							violation = true
+							message = "Only one level inward importing is allowed"
+
+							if i <= a {
+								// Importing from same or higher level
+								suggestion = fmt.Sprintf("Consider moving '%s' to a deeper level than '%s'",
+									strings.Trim(pkgImport, `"`), strings.Trim(packageMap[pkg].Path, `"`))
+							} else {
+								// Importing from too deep
+								suggestion = fmt.Sprintf("Consider reorganizing layers to ensure '%s' is exactly one level below '%s'",
+									strings.Trim(pkgImport, `"`), strings.Trim(packageMap[pkg].Path, `"`))
 							}
 						}
-					default:
+					} else {
+						// In normal mode, disallow same-level or higher-level imports
 						if contains(packageLevels[a], pkgImport) && i <= a {
-							errMsg := fmt.Sprintf("%v", "Importing a package of the same level is not allowed")
-							errMsg = fmt.Sprintf("%v\nLv%v: %v <-- Lv%v: %v \n", errMsg, i, strings.Trim(packageMap[pkg].Path, ModPath), a, strings.Trim(pkgImport, ModPath))
-							if !containsInCheckResults(results, errMsg) {
-								UncleBobIsSad = true
-								results = append(results, clog.NewWarning(errMsg))
-								break
+							violation = true
+							message = "Importing a package of the same level is not allowed"
+
+							// If it's a utility package being imported at the same level
+							if isUtilityPackage(pkgImport) {
+								suggestion = fmt.Sprintf("'%s' appears to be a utility package. Consider moving it to a deeper level",
+									strings.Trim(pkgImport, `"`))
+							} else {
+								suggestion = fmt.Sprintf("Consider moving '%s' to a deeper level than '%s'",
+									strings.Trim(pkgImport, `"`), strings.Trim(packageMap[pkg].Path, `"`))
 							}
 						}
 					}
 
+					if violation {
+						fromPkg := strings.Trim(packageMap[pkg].Path, `"`)
+						toPkg := strings.Trim(pkgImport, `"`)
+
+						errMsg := fmt.Sprintf("%s\nLv%d: %s <-- Lv%d: %s\nSuggestion: %s",
+							message, i, fromPkg, a, toPkg, suggestion)
+
+						if !containsInCheckResults(results, errMsg) {
+							results = append(results, clog.NewWarning(errMsg))
+							break
+						}
+					}
 				}
 			}
 		}
 	}
 
-	for _, v := range results {
-		clog.PrintColorMessage(v)
-	}
-}
-
-func LevelsInfo(packageLevels [][]string) {
-	var results []clog.CheckResult
-
-	for lvl, packageLevel := range packageLevels {
-		msg := fmt.Sprintf("Level %v packages:\n", lvl)
-
-		for _, packageImport := range packageLevel {
-			msg = fmt.Sprintf("%v%v \n", msg, packageImport)
-		}
-
-		results = append(results, clog.NewInfo(msg))
-	}
-
-	for _, v := range results {
-		clog.PrintColorMessage(v)
-	}
-}
-
-func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
-	clog.Info("Package: " + packageName)
-	var results []clog.CheckResult
-
-	// get package dir
-	packagePath := workdir + strings.TrimPrefix(packageName, ModPath)
-	packagePath = strings.Trim(packagePath, `"`)
-
-	filepath.Walk(packagePath, func(path string, info os.FileInfo, err error) error {
-		// log and skip if error is not nil
-		if err != nil {
-			results = append(results, clog.NewError(err.Error()))
-			return nil
-		}
-
-		// skip directories, non go files and other invalid filenames
-		if info.IsDir() || (len(info.Name()) > 3 && info.Name()[len(info.Name())-3:] != ".go") {
-			return nil
-		}
-
-		dirString, fileString := filepath.Split(path)
-
-		if strings.Contains(dirString, "/.git/") {
-			return nil
-		}
-
-		if ignoreTests && strings.HasSuffix(fileString, "_test.go") {
-			return nil
-		}
-
-		msg := fmt.Sprintf("file: %v \n imports: \n", info.Name())
-
-		fileImports, err := getImportsForFile(path)
-
-		if err != nil {
-			results = append(results, clog.NewError(err.Error()))
-			return nil
-		}
-
-		for _, fileImport := range fileImports {
-			msg = fmt.Sprintf("%v\n<-- %v", msg, fileImport)
-		}
-
-		msg = fmt.Sprintf("%v \n\n", msg)
-
-		results = append(results, clog.NewInfo(msg))
-
-		return nil
-	})
-
+	// Print all violations
 	for _, v := range results {
 		clog.PrintColorMessage(v)
 	}
@@ -136,204 +105,405 @@ func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []
 	return results
 }
 
-func SetUniqueLevels(packageMap map[string]PackageInfo) [][]string {
-	var topLevelPackages []string
-
-	// loop through all package imports of all packages
-	for _, packageInfo := range packageMap {
-		packageIsMentionedInImports := false
-
-		// find a package that is not imported by any other packages, usually main
-		for _, packageDetails := range packageMap {
-			if contains(packageDetails.Imports, packageInfo.Path) {
-				packageIsMentionedInImports = true
-			}
-		}
-		if !packageIsMentionedInImports {
-			topLevelPackages = append(topLevelPackages, packageInfo.Path)
-		}
-	}
-
-	packagesByLevel := make([][]string, 0)
-	packagesByLevel = append(packagesByLevel, topLevelPackages)
-
-	packagesUsed := make([]string, 0, 0)
-	packagesUsed = append(packagesUsed, topLevelPackages...)
-	// loop through imports of packages and group them by import level
-	levelIndex := 0
-
-	for {
-		// if level is empty, break loop
-		if len(packagesByLevel[levelIndex]) == 0 {
-			break
-		}
-		// create another level
-		packagesByLevel = append(packagesByLevel, make([]string, 0, 0))
-		for _, levelPackage := range packagesByLevel[levelIndex] {
-			// find which packages are imported by packages of the current level
-			for _, levelPackageImport := range packageMap[levelPackage].Imports {
-				if !contains(packagesUsed, levelPackageImport) {
-					packagesUsed = append(packagesUsed, levelPackageImport)
-					// send the import to next level
-					packagesByLevel[levelIndex+1] = append(packagesByLevel[levelIndex+1], levelPackageImport)
-				}
-			}
-		}
-		levelIndex++
-	}
-
-	return packagesByLevel[:len(packagesByLevel)-1]
+// CleanArchitectureLayers contains descriptions of layers in Clean Architecture
+var CleanArchitectureLayers = []string{
+	"Frameworks & Drivers (outermost layer)",
+	"Interface Adapters",
+	"Application Business Rules",
+	"Enterprise Business Rules (innermost layer)",
 }
 
-func SetLevels(packageMap map[string]PackageInfo) [][]string {
-	var topLevelPackages []string
+// LevelsInfo displays information about package levels with Clean Architecture context
+func LevelsInfo(packageLevels [][]string) {
+	// Show Clean Architecture layer info
+	if len(packageLevels) > 0 {
+		clog.Info("Clean Architecture Reference:")
 
-	// loop through all package imports of all packages
-	for _, packageInfo := range packageMap {
-		packageIsMentionedInImports := false
+		// Calculate the maximum level we have, to map to Clean Architecture layers
+		maxLevels := len(packageLevels)
+		caLayers := CleanArchitectureLayers
 
-		// find a package that is not imported by any other packages, usually main
-		for _, packageDetails := range packageMap {
-			if contains(packageDetails.Imports, packageInfo.Path) {
-				packageIsMentionedInImports = true
-			}
+		// If we have fewer packages than layers, truncate the layers to match
+		if maxLevels < len(caLayers) {
+			caLayers = caLayers[:maxLevels]
 		}
-		if !packageIsMentionedInImports {
-			topLevelPackages = append(topLevelPackages, packageInfo.Path)
+
+		// Print Clean Architecture layer guidance
+		for i, layer := range caLayers {
+			levelMsg := fmt.Sprintf("Level %d ~ %s", i, layer)
+			indentedResult := clog.NewInfo(levelMsg).WithIndent(1)
+			clog.PrintColorMessage(indentedResult)
 		}
+
+		clog.Info("")
 	}
 
-	packagesByLevel := make([][]string, 0)
-	packagesByLevel = append(packagesByLevel, topLevelPackages)
-
-	// loop through imports of packages and group them by import level
-	currentPackageLevel := 0
-	for len(packagesByLevel[currentPackageLevel]) > 0 {
-		packagesByLevel = append(packagesByLevel, make([]string, 0, 0))
-		for _, packagePath := range packagesByLevel[currentPackageLevel] {
-
-			if _, ok := packageMap[packagePath]; ok {
-				for _, packageImport := range packageMap[packagePath].Imports {
-					if !contains(packagesByLevel[currentPackageLevel+1], packageImport) {
-						packagesByLevel[currentPackageLevel+1] = append(packagesByLevel[currentPackageLevel+1], packageImport)
-					}
-				}
-			}
+	// Display actual package levels
+	clog.Info("Package Levels:")
+	for lvl, packageLevel := range packageLevels {
+		if len(packageLevel) == 0 {
+			continue
 		}
 
-		currentPackageLevel++
-	}
+		// Determine if this level aligns with a Clean Architecture layer
+		layerInfo := ""
+		if lvl < len(CleanArchitectureLayers) {
+			layerInfo = fmt.Sprintf(" ~ %s", CleanArchitectureLayers[lvl])
+		}
 
-	return packagesByLevel
+		msg := fmt.Sprintf("Level %d%s packages:", lvl, layerInfo)
+		result := clog.NewInfo(msg)
+		clog.PrintColorMessage(result)
+
+		// Print each package with indentation for better readability
+		for _, packageImport := range packageLevel {
+			// Clean up the package string for display
+			cleanPkg := strings.Trim(packageImport, `"`)
+
+			// Determine package type label
+			packageLabel := ""
+			if isEntryPointPackage(packageImport) {
+				packageLabel = " (entry point)"
+			} else if isUtilityPackage(packageImport) {
+				packageLabel = " (utility)"
+			}
+
+			pkgMsg := fmt.Sprintf("- %s%s", cleanPkg, packageLabel)
+			indentedResult := clog.NewInfo(pkgMsg).WithIndent(1)
+			clog.PrintColorMessage(indentedResult)
+		}
+	}
 }
 
-func Map(workdir string, ignoreTests bool) (map[string]PackageInfo, []clog.CheckResult) {
+// DisplayPackageInfo shows detailed information about a specific package
+func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
 	var results []clog.CheckResult
 
-	PackageMap := make(map[string]PackageInfo)
+	// Display package name
+	clog.Info(fmt.Sprintf("Package: %s", packageName))
 
-	filepath.Walk(workdir, func(path string, info os.FileInfo, err error) error {
-		// log and skip if error is not nil
+	// Get package directory
+	packagePath := workdir + strings.TrimPrefix(packageName, ModPath)
+	packagePath = strings.Trim(packagePath, `"`)
+
+	// Track if the package exists
+	packageExists := false
+
+	// Walk the file system to find package files
+	filepath.Walk(packagePath, func(path string, info os.FileInfo, err error) error {
+		// Log and skip if error is not nil
 		if err != nil {
 			results = append(results, clog.NewError(err.Error()))
 			return nil
 		}
 
-		// skip directories, non go files and other invalid filenames
+		// Skip directories, non-go files and other invalid filenames
 		if info.IsDir() || (len(info.Name()) > 3 && info.Name()[len(info.Name())-3:] != ".go") {
 			return nil
 		}
 
 		dirString, fileString := filepath.Split(path)
 
+		// Skip git files
 		if strings.Contains(dirString, "/.git/") {
 			return nil
 		}
 
+		// Skip test files if requested
 		if ignoreTests && strings.HasSuffix(fileString, "_test.go") {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(workdir, path)
+		packageExists = true
 
-		if err != nil {
-			results = append(results, clog.NewError(err.Error()))
-			return nil
-		}
-
+		// Get file imports
 		fileImports, err := getImportsForFile(path)
-
 		if err != nil {
 			results = append(results, clog.NewError(err.Error()))
 			return nil
 		}
 
+		// Display file information
+		fileMsg := fmt.Sprintf("File: %s", info.Name())
+		results = append(results, clog.NewInfo(fileMsg))
+
+		// Display imports with indentation
+		if len(fileImports) > 0 {
+			importMsg := "Imports:"
+			results = append(results, clog.NewInfo(importMsg).WithIndent(1))
+
+			for _, fileImport := range fileImports {
+				results = append(results,
+					clog.NewInfo(fmt.Sprintf("- %s", fileImport)).WithIndent(2))
+			}
+		} else {
+			results = append(results,
+				clog.NewInfo("No imports").WithIndent(1))
+		}
+
+		return nil
+	})
+
+	// If package doesn't exist, show error
+	if !packageExists {
+		results = append(results, clog.NewError(fmt.Sprintf("Package not found: %s", packageName)))
+	}
+
+	// Print all results
+	for _, v := range results {
+		clog.PrintColorMessage(v)
+	}
+
+	return results
+}
+
+// utilityPathPatterns is a list of path patterns that are considered utilities/shared libraries
+// and should be placed at deeper levels
+var utilityPathPatterns = []string{
+	"utilities",
+	"common",
+	"pkg",
+	"shared",
+	"lib",
+}
+
+// isUtilityPackage determines if a package is a utility/shared library based on its path
+func isUtilityPackage(packagePath string) bool {
+	packagePath = strings.Trim(packagePath, `"`)
+	for _, pattern := range utilityPathPatterns {
+		if strings.Contains(packagePath, "/"+pattern+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// isEntryPointPackage determines if a package is an entry point (like main)
+// Entry points are special cases that are allowed to import from any layer
+func isEntryPointPackage(packagePath string) bool {
+	packagePath = strings.Trim(packagePath, `"`)
+
+	// Main packages are typically in the root or named 'cmd'
+	if strings.HasSuffix(packagePath, "/.") ||
+		strings.HasSuffix(packagePath, "/main") ||
+		strings.Contains(packagePath, "/cmd/") {
+		return true
+	}
+
+	return false
+}
+
+// getPackageDepth returns the logical depth of a package based on its path
+// This helps ensure utility packages are placed at deeper levels
+func getPackageDepth(packagePath string) int {
+	packagePath = strings.Trim(packagePath, `"`)
+	if isUtilityPackage(packagePath) {
+		// Assign utility packages an extra level of depth
+		return strings.Count(packagePath, "/") + 1
+	}
+	return strings.Count(packagePath, "/")
+}
+
+// SetUniqueLevels analyzes package dependencies and assigns unique levels
+// taking into account both import relationships and directory structure
+func SetUniqueLevels(packageMap map[string]PackageInfo) [][]string {
+	var topLevelPackages []string
+	packageLevels := make(map[string]int)
+
+	// Find packages not imported by any other package (usually main)
+	for _, packageInfo := range packageMap {
+		packageIsMentionedInImports := false
+
+		for _, packageDetails := range packageMap {
+			if contains(packageDetails.Imports, packageInfo.Path) {
+				packageIsMentionedInImports = true
+			}
+		}
+
+		if !packageIsMentionedInImports {
+			topLevelPackages = append(topLevelPackages, packageInfo.Path)
+			packageLevels[packageInfo.Path] = 0
+		}
+	}
+
+	// First phase: Assign initial levels based on import relationships
+	packagesVisited := make(map[string]bool)
+	for _, pkg := range topLevelPackages {
+		packagesVisited[pkg] = true
+	}
+
+	// BFS traversal to assign levels
+	var queue []string
+	queue = append(queue, topLevelPackages...)
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		currentLevel := packageLevels[current]
+
+		for _, imported := range packageMap[current].Imports {
+			// If we haven't assigned a level or the new level would be deeper, update it
+			if level, exists := packageLevels[imported]; !exists || level < currentLevel+1 {
+				packageLevels[imported] = currentLevel + 1
+			}
+
+			if !packagesVisited[imported] {
+				packagesVisited[imported] = true
+				queue = append(queue, imported)
+			}
+		}
+	}
+
+	// Second phase: Adjust levels based on path structure
+	for pkg := range packageLevels {
+		pathDepth := getPackageDepth(pkg)
+		if pathDepth > packageLevels[pkg] {
+			// If a package's path suggests it should be deeper, increase its level
+			packageLevels[pkg] = pathDepth
+		}
+	}
+
+	// Find maximum level to determine array size
+	maxLevel := 0
+	for _, level := range packageLevels {
+		if level > maxLevel {
+			maxLevel = level
+		}
+	}
+
+	// Organize packages by their computed levels
+	packagesByLevel := make([][]string, maxLevel+1)
+	for pkg, level := range packageLevels {
+		packagesByLevel[level] = append(packagesByLevel[level], pkg)
+	}
+
+	// Remove empty levels
+	result := make([][]string, 0)
+	for _, pkgs := range packagesByLevel {
+		if len(pkgs) > 0 {
+			result = append(result, pkgs)
+		}
+	}
+
+	return result
+}
+
+// Map builds a dependency map of the codebase
+func Map(workdir string, ignoreTests bool) (map[string]PackageInfo, []clog.CheckResult) {
+	var results []clog.CheckResult
+	packageMap := make(map[string]PackageInfo)
+
+	clog.Info("Analyzing packages...")
+
+	// Walk through the project files
+	filepath.Walk(workdir, func(path string, info os.FileInfo, err error) error {
+		// Log and skip if error is not nil
+		if err != nil {
+			results = append(results, clog.NewError(err.Error()))
+			return nil
+		}
+
+		// Skip directories, non go files and other invalid filenames
+		if info.IsDir() || (len(info.Name()) > 3 && info.Name()[len(info.Name())-3:] != ".go") {
+			return nil
+		}
+
+		dirString, fileString := filepath.Split(path)
+
+		// Skip git files
+		if strings.Contains(dirString, "/.git/") {
+			return nil
+		}
+
+		// Skip test files if requested
+		if ignoreTests && strings.HasSuffix(fileString, "_test.go") {
+			return nil
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(workdir, path)
+		if err != nil {
+			results = append(results, clog.NewError(err.Error()))
+			return nil
+		}
+
+		// Get file imports
+		fileImports, err := getImportsForFile(path)
+		if err != nil {
+			results = append(results, clog.NewError(err.Error()))
+			return nil
+		}
+
+		// Create package path
 		packagePath := fmt.Sprintf("%q", ModPath+"/"+filepath.Dir(relPath))
 
-		if _, ok := PackageMap[packagePath]; ok {
-			packageMapItem := PackageMap[packagePath]
-			packageMapItem.Files = append(packageMapItem.Files, fileString)
-			// add missing imports
-			packageImports := packageMapItem.Imports
+		// Update or create package info
+		if existingInfo, ok := packageMap[packagePath]; ok {
+			// Update existing package
+			existingInfo.Files = append(existingInfo.Files, fileString)
 
+			// Add missing imports
+			for _, packageImport := range fileImports {
+				if strings.Index(packageImport, ModPath) > 0 {
+					existingInfo.Imports = AppendStringIfMissing(existingInfo.Imports, packageImport)
+				}
+			}
+
+			packageMap[packagePath] = existingInfo
+		} else {
+			// Create new package
+			packageInfo := PackageInfo{
+				Path:  packagePath,
+				Files: []string{fileString},
+				Level: 0,
+			}
+
+			// Add imports from project
+			var packageImports []string
 			for _, packageImport := range fileImports {
 				if strings.Index(packageImport, ModPath) > 0 {
 					packageImports = AppendStringIfMissing(packageImports, packageImport)
 				}
 			}
 
-			packageMapItem.Imports = packageImports
-			PackageMap[packagePath] = packageMapItem
-			return nil
+			packageInfo.Imports = packageImports
+			packageMap[packagePath] = packageInfo
 		}
-
-		packageInfo := PackageInfo{
-			Path:  packagePath,
-			Files: []string{fileString},
-			Level: 0,
-		}
-
-		var packageImports []string
-		for _, packageImport := range fileImports {
-			if strings.Index(packageImport, ModPath) > 0 {
-				packageImports = AppendStringIfMissing(packageImports, packageImport)
-			}
-		}
-
-		packageInfo.Imports = packageImports
-		PackageMap[packagePath] = packageInfo
 
 		return nil
 	})
 
+	// Print any errors that occurred during mapping
 	for _, v := range results {
 		clog.PrintColorMessage(v)
 	}
 
-	return PackageMap, results
+	return packageMap, results
 }
 
-func AppendStringIfMissing(slice []string, i string) []string {
-	for _, ele := range slice {
-		if ele == i {
+// AppendStringIfMissing adds a string to a slice if it's not already present
+func AppendStringIfMissing(slice []string, item string) []string {
+	for _, element := range slice {
+		if element == item {
 			return slice
 		}
 	}
-	return append(slice, i)
+	return append(slice, item)
 }
 
+// getImportsForFile parses a Go file and returns its imports
 func getImportsForFile(path string) ([]string, error) {
 	fpath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
+
 	imports, err := parser.ParseFile(token.NewFileSet(), fpath, nil, parser.ImportsOnly)
 	if err != nil {
 		return nil, err
 	}
 
 	dependencies := make([]string, 0, len(imports.Imports))
-
 	for _, v := range imports.Imports {
 		dependencies = append(dependencies, v.Path.Value)
 	}
