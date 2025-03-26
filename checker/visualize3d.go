@@ -324,35 +324,7 @@ const threejsTemplate = `<!DOCTYPE html>
             border: 1px solid rgba(0,255,255,0.3);
         }
         
-        .drag-handle {
-            cursor: move;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #00ffc6;
-            font-size: 24px;
-            pointer-events: all;
-            z-index: 100;
-            background-color: rgba(10,10,30,0.7);
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            text-align: center;
-            line-height: 28px;
-            user-select: none;
-            display: block;
-            padding-top: 12px;
-            box-shadow: 0 0 20px rgba(0,255,255,0.5);
-            border: 2px solid rgba(0,255,255,0.4);
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(0,255,255,0.5); }
-            50% { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 0 25px rgba(0,255,255,0.7); }
-            100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(0,255,255,0.5); }
-        }
+        /* Removed drag handle styles */
         
         button {
             margin: 5px;
@@ -414,12 +386,10 @@ const threejsTemplate = `<!DOCTYPE html>
 <body>
     <div id="info">
         <h1>U_ARCH :: CLEAN ARCHITECTURE VISUALIZER</h1>
-        <p>LEFT-CLICK: PAN | RIGHT-CLICK: ROTATE | SCROLL: ZOOM | CENTER HANDLE: DRAG BUILDING</p>
+        <p>LEFT-CLICK: PAN | RIGHT-CLICK: ROTATE | SCROLL: ZOOM</p>
     </div>
     
-    <div id="dragHandle" class="drag-handle">
-        <span style="font-size: 28px;">⬌</span>
-    </div>
+    <!-- Removed drag handle -->
     
     <div class="legend">
         <h3>Legend</h3>
@@ -516,10 +486,10 @@ const threejsTemplate = `<!DOCTYPE html>
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0a0f); // Dark blue-black
 
-            // Create camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(20, 20, 20);
-            camera.lookAt(0, 0, 0);
+            // Create camera with top-down perspective slightly tilted back
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 70, 40); // Position higher up, panned more toward bottom to see roof and front
+            camera.lookAt(0, 0, -10);
 
             // Create renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -544,25 +514,35 @@ const threejsTemplate = `<!DOCTYPE html>
 
             // Main directional light
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(10, 20, 10);
+            directionalLight.position.set(0, 50, 30);
             directionalLight.castShadow = true;
             scene.add(directionalLight);
             
             // Add colored spotlights for cyberpunk effect
-            const spotLight1 = new THREE.SpotLight(0xff00ff, 0.8); // Magenta spotlight
-            spotLight1.position.set(-15, 30, -15);
-            spotLight1.angle = Math.PI / 6;
+            const spotLight1 = new THREE.SpotLight(0xff00ff, 0.8); // Magenta spotlight for left building
+            spotLight1.position.set(-25, 40, 0);
+            spotLight1.angle = Math.PI / 4;
             spotLight1.penumbra = 0.3;
             scene.add(spotLight1);
             
-            const spotLight2 = new THREE.SpotLight(0x00ffff, 0.8); // Cyan spotlight
-            spotLight2.position.set(15, 30, 15);
-            spotLight2.angle = Math.PI / 6;
+            const spotLight2 = new THREE.SpotLight(0x00ffff, 0.8); // Cyan spotlight for right building
+            spotLight2.position.set(25, 40, 0);
+            spotLight2.angle = Math.PI / 4;
             spotLight2.penumbra = 0.3;
             scene.add(spotLight2);
+            
+            // Add rim lighting
+            const rimLight1 = new THREE.DirectionalLight(0xff3677, 0.6); // Pink rim light
+            rimLight1.position.set(-30, 15, -20);
+            scene.add(rimLight1);
+            
+            const rimLight2 = new THREE.DirectionalLight(0x38ecff, 0.6); // Blue rim light
+            rimLight2.position.set(30, 15, -20);
+            scene.add(rimLight2);
 
-            // Create building foundation
-            createFoundation();
+            // Create foundations for both buildings 
+            createFoundation(-25); // Left building
+            createFoundation(25);  // Right building
 
             // Create floors with packages
             createBuilding();
@@ -590,10 +570,10 @@ const threejsTemplate = `<!DOCTYPE html>
         }
 
         // Create the building foundation
-        function createFoundation() {
-            // Create a wider foundation 
+        function createFoundation(offsetX = 0) {
+            // Create a foundation for each building
             const foundationGeometry = new THREE.BoxGeometry(
-                40, 1, 40
+                35, 1, 35
             );
             const foundationMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0x2d00f7, // Deep electric blue
@@ -603,16 +583,13 @@ const threejsTemplate = `<!DOCTYPE html>
                 emissiveIntensity: 0.4
             });
             const foundation = new THREE.Mesh(foundationGeometry, foundationMaterial);
-            foundation.position.y = floorBaseY - 1;
+            foundation.position.set(offsetX, floorBaseY - 1, 0);
             foundation.receiveShadow = true;
             scene.add(foundation);
-            
-            // Add foundation text
-            addFloorLabel("Clean Architecture Building", 0, floorBaseY - 0.5);
         }
         
         // Add text label above each floor
-        function addFloorLabel(text, level, y) {
+        function addFloorLabel(text, level, y, x = 0, z = -12) {
             // Create canvas for the text
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
@@ -637,22 +614,24 @@ const threejsTemplate = `<!DOCTYPE html>
             
             // Create mesh and position it
             const textMesh = new THREE.Mesh(geometry, material);
-            textMesh.position.set(0, y, -12);
+            textMesh.position.set(x, y, z);
             textMesh.rotation.x = -Math.PI / 8; // Tilt slightly for better visibility
             
             // Add to scene
             scene.add(textMesh);
         }
 
-        // Create the building with floors and packages
+        // Create the buildings with floors and packages
         function createBuilding() {
             scene.add(floorGroup);
+            
+            // Create first building (dependency levels)
+            const building1OffsetX = -25; // Position first building on the left
             
             buildingData.floors.forEach((floor, index) => {
                 const floorY = floorBaseY + index * normalFloorSpacing;
                 
                 // Create floor
-                // Create wider floors
                 const floorGeometry = new THREE.BoxGeometry(30, floorHeight, 30);
                 const floorMaterial = new THREE.MeshStandardMaterial({ 
                     color: getFloorColor(index),
@@ -664,19 +643,274 @@ const threejsTemplate = `<!DOCTYPE html>
                     emissiveIntensity: 0.3
                 });
                 const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-                floorMesh.position.y = floorY;
+                floorMesh.position.set(building1OffsetX, floorY, 0); // Offset X position
                 floorMesh.receiveShadow = true;
                 floorGroup.add(floorMesh);
                 
                 // Add floor label
                 const labelText = floor.label || "Level " + index;
-                addFloorLabel(labelText, index, floorY + floorHeight/2 + 0.5);
+                addFloorLabel(labelText, index, floorY + floorHeight/2 + 0.5, building1OffsetX, -12);
                 
-                // Create packages on this floor
+                // Create packages on this floor with X offset
                 floor.packages.forEach(pkg => {
-                    createPackage(pkg, floorY);
+                    createPackage(pkg, floorY, building1OffsetX);
                 });
             });
+            
+            // Create second building (path structure)
+            const building2OffsetX = 25; // Position second building on the right
+            
+            // Organize packages by path depth
+            const pathDepthMap = {};
+            let maxPathDepth = 0;
+            
+            // Group packages by path depth
+            buildingData.floors.forEach(floor => {
+                floor.packages.forEach(pkg => {
+                    // Calculate path depth based on the number of "/" in the package path
+                    // First, remove any leading protocol or domain parts like "github.com/"
+                    let cleanPath = pkg.name;
+                    // Remove module path prefix if present
+                    if (cleanPath.includes('/')) {
+                        // Find the first directory level
+                        const firstSlashIndex = cleanPath.indexOf('/');
+                        if (firstSlashIndex > 0) {
+                            // Get just the path part after module prefix
+                            const parts = cleanPath.split('/');
+                            // Count remaining path components (subtract 3 for typical GitHub paths)
+                            const pathDepth = Math.max(0, parts.length - 3);
+                            maxPathDepth = Math.max(maxPathDepth, pathDepth);
+                            
+                            if (!pathDepthMap[pathDepth]) {
+                                pathDepthMap[pathDepth] = [];
+                            }
+                            
+                            // Copy the package data with adjusted position
+                            pathDepthMap[pathDepth].push({
+                                ...pkg,
+                                pathDepth: pathDepth
+                            });
+                        }
+                    } else {
+                        // If no slashes (root package), put it at depth 0
+                        if (!pathDepthMap[0]) {
+                            pathDepthMap[0] = [];
+                        }
+                        pathDepthMap[0].push({
+                            ...pkg,
+                            pathDepth: 0
+                        });
+                    }
+                });
+            });
+            
+            // Create floors for path structure building with reversed order
+            // Deeper paths should be at the bottom, like utilities in the dependency building
+            
+            // Check if we have any packages at all depths
+            for (let i = 0; i <= maxPathDepth; i++) {
+                if (!pathDepthMap[i]) {
+                    pathDepthMap[i] = [];
+                }
+            }
+            
+            // Reverse the floors - depth 0 will be at the top, maxDepth at the bottom
+            for (let depth = 0; depth <= maxPathDepth; depth++) {
+                const packages = pathDepthMap[depth] || [];
+                if (packages.length === 0 && depth > 0) continue; // Always show level 0, even if empty
+                
+                // Calculate reversed position - deeper paths at the bottom
+                // This maps depth 0 to the top floor and maxDepth to the bottom floor
+                const reversedDepth = maxPathDepth - depth;
+                const floorY = floorBaseY + reversedDepth * normalFloorSpacing;
+                
+                // Create floor
+                const floorGeometry = new THREE.BoxGeometry(30, floorHeight, 30);
+                const floorMaterial = new THREE.MeshStandardMaterial({ 
+                    color: getPathColor(depth, maxPathDepth),
+                    transparent: true,
+                    opacity: 0.6,
+                    roughness: 0.2,
+                    metalness: 0.9,
+                    emissive: getPathColor(depth, maxPathDepth),
+                    emissiveIntensity: 0.3
+                });
+                const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+                floorMesh.position.set(building2OffsetX, floorY, 0); // Offset X position
+                floorMesh.receiveShadow = true;
+                floorGroup.add(floorMesh);
+                
+                // Add floor label for path structure (showing reversed)
+                // Use the actual depth number, but the position is reversed
+                const labelText = "Path Depth " + depth + (depth === 0 ? " (Root)" : (depth === maxPathDepth ? " (Deepest)" : ""));
+                addFloorLabel(labelText, reversedDepth, floorY + floorHeight/2 + 0.5, building2OffsetX, -12);
+                
+                // Calculate grid layout for packages
+                const numPackages = packages.length;
+                const gridSize = Math.ceil(Math.sqrt(numPackages));
+                const floorSize = 26.0;
+                const spacingX = floorSize / gridSize * 1.2;
+                const spacingZ = floorSize / gridSize * 1.2;
+                const startX = -floorSize/2 + spacingX/2;
+                const startZ = -floorSize/2 + spacingZ/2;
+                
+                // Create packages for this floor
+                packages.forEach((pkg, j) => {
+                    // Calculate grid position
+                    const row = Math.floor(j / gridSize);
+                    const col = j % gridSize;
+                    
+                    // Calculate actual position with even spacing
+                    const posX = startX + col * spacingX;
+                    const posZ = startZ + row * spacingZ;
+                    
+                    // Size based on spacing but with margins
+                    const pkgWidth = spacingX * 0.8;
+                    const pkgDepth = spacingZ * 0.8;
+                    
+                    // Create package with the right position
+                    createPathPackage(pkg, floorY, building2OffsetX, posX, posZ, pkgWidth, pkgDepth);
+                });
+            }
+            
+            // Add connecting foundation between buildings at the same level
+            const connectionGeometry = new THREE.BoxGeometry(30, 1, 5);
+            const connectionMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2d00f7,
+                roughness: 0.3,
+                metalness: 0.8,
+                emissive: 0x100060,
+                emissiveIntensity: 0.2
+            });
+            const connection = new THREE.Mesh(connectionGeometry, connectionMaterial);
+            connection.position.set(0, floorBaseY - 1, 0);
+            connection.receiveShadow = true;
+            scene.add(connection);
+            
+            // Add labels for buildings
+            addBuildingLabel("Dependency Structure", building1OffsetX, floorBaseY - 3, 0);
+            addBuildingLabel("Path Structure", building2OffsetX, floorBaseY - 3, 0);
+        }
+        
+        // Get color for path depth floors
+        function getPathColor(depth, maxDepth) {
+            // Create a gradient from yellow (shallow) to purple (deep)
+            const colors = [
+                0xffdd00, // Yellow - depth 0 (shallowest paths)
+                0xff9500, // Orange - depth 1
+                0xff00aa, // Pink - depth 2
+                0x9900ff, // Purple - depth 3
+                0x4400ff  // Deep purple - depth 4+ (deepest paths)
+            ];
+            
+            // Use direct index for first few levels, then normalize for deeper levels
+            if (depth < colors.length) {
+                return colors[depth];
+            } else {
+                // For deeper paths, use the last color
+                return colors[colors.length - 1];
+            }
+        }
+        
+        // Add a label for each building
+        function addBuildingLabel(text, x, y, z) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+            context.fillStyle = '#00ffc6';
+            context.font = 'Bold 32px Orbitron';
+            context.textAlign = 'center';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const geometry = new THREE.PlaneGeometry(12, 3);
+            
+            const textMesh = new THREE.Mesh(geometry, material);
+            textMesh.position.set(x, y, z);
+            
+            scene.add(textMesh);
+        }
+        
+        // Create a package for the path structure building
+        function createPathPackage(pkg, floorY, buildingOffsetX, posX, posZ, width, depth) {
+            const height = floorHeight * 0.7;
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            
+            // Use the same cyberpunk color for the package
+            const packageColor = pkg.isEntryPoint ? 0xff003c : (pkg.isUtility ? 0xffea00 : 0xd1f7ff);
+            const material = new THREE.MeshStandardMaterial({
+                color: packageColor,
+                roughness: 0.2,
+                metalness: 0.8,
+                emissive: packageColor,
+                emissiveIntensity: 0.2
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // Position accounting for the building offset
+            mesh.position.set(
+                buildingOffsetX + posX, 
+                floorY + height/2, 
+                posZ
+            );
+            
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            // Create a unique ID for this path package
+            const pathId = pkg.id + "_path";
+            
+            // Store mesh reference and package data 
+            mesh.userData = {
+                id: pathId,
+                name: pkg.name,
+                shortName: pkg.shortName,
+                level: pkg.pathDepth,
+                isEntryPoint: pkg.isEntryPoint,
+                isUtility: pkg.isUtility
+            };
+            
+            // Store this package in the packageObjects map so we can access it during explosion
+            packageObjects[pathId] = {
+                mesh: mesh,
+                data: pkg,
+                y: floorY + height/2
+            };
+            
+            floorGroup.add(mesh);
+            
+            // Add text label
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 128;
+            canvas.height = 64;
+            context.fillStyle = '#000000';
+            context.font = 'Bold 20px Arial';
+            context.textAlign = 'center';
+            context.fillText(pkg.shortName, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const labelGeometry = new THREE.PlaneGeometry(width * 1.2, width * 0.6);
+            const label = new THREE.Mesh(labelGeometry, labelMaterial);
+            label.position.y = height/2 + 0.05;
+            label.rotation.x = -Math.PI / 2;
+            
+            mesh.add(label);
         }
         
         // Get color for floor based on level
@@ -693,7 +927,7 @@ const threejsTemplate = `<!DOCTYPE html>
         }
 
         // Create individual package (room in the building)
-        function createPackage(pkg, floorY) {
+        function createPackage(pkg, floorY, buildingOffsetX = 0) {
             // Create package box
             const height = floorHeight * 0.7;
             const geometry = new THREE.BoxGeometry(pkg.width, height, pkg.depth);
@@ -709,9 +943,9 @@ const threejsTemplate = `<!DOCTYPE html>
             
             const mesh = new THREE.Mesh(geometry, material);
             
-            // Position using the pre-calculated positions
+            // Position using the pre-calculated positions, applying building offset
             mesh.position.set(
-                pkg.x, 
+                buildingOffsetX + pkg.x, 
                 floorY + height/2, 
                 pkg.z
             );
@@ -978,73 +1212,11 @@ const threejsTemplate = `<!DOCTYPE html>
             });
         }
         
-        // Setup drag functionality for moving the entire scene
+        // Setup functionality for scene manipulation
         function setupDragFunctionality() {
-            const dragHandle = document.getElementById('dragHandle');
-            let isDragging = false;
-            let previousMousePosition = { x: 0, y: 0 };
-            
-            // Offset for the entire scene
+            // Just initialize the offset object for the floor group
+            // No drag functionality needed since we're using orbit controls
             floorGroup.userData.offset = { x: 0, y: 0, z: 0 };
-            
-            // Mouse down event
-            dragHandle.addEventListener('mousedown', function(e) {
-                isDragging = true;
-                previousMousePosition = {
-                    x: e.clientX,
-                    y: e.clientY
-                };
-                e.preventDefault();
-                
-                // Temporarily disable orbit controls while dragging
-                controls.enabled = false;
-            });
-            
-            // Mouse move event
-            document.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                
-                // Calculate movement delta
-                const deltaMove = {
-                    x: e.clientX - previousMousePosition.x,
-                    y: e.clientY - previousMousePosition.y
-                };
-                
-                // Update position based on mouse movement
-                const sensitivity = 0.02; // Adjust sensitivity as needed
-                floorGroup.position.x += deltaMove.x * sensitivity;
-                floorGroup.position.z += deltaMove.y * sensitivity;
-                
-                // Store the offset for reset functionality
-                floorGroup.userData.offset.x = floorGroup.position.x;
-                floorGroup.userData.offset.z = floorGroup.position.z;
-                
-                // Update previous mouse position
-                previousMousePosition = {
-                    x: e.clientX,
-                    y: e.clientY
-                };
-                
-                e.preventDefault();
-            });
-            
-            // Mouse up event
-            document.addEventListener('mouseup', function() {
-                if (isDragging) {
-                    isDragging = false;
-                    // Re-enable orbit controls
-                    controls.enabled = true;
-                }
-            });
-            
-            // Mouse leave event
-            document.addEventListener('mouseleave', function() {
-                if (isDragging) {
-                    isDragging = false;
-                    // Re-enable orbit controls
-                    controls.enabled = true;
-                }
-            });
         }
         
         // Toggle exploded view
@@ -1068,13 +1240,18 @@ const threejsTemplate = `<!DOCTYPE html>
             // Find all floor meshes and store their starting positions
             const floorMeshes = [];
             const floorLabels = [];
+            
+            // Get all meshes that need to be exploded
             floorGroup.children.forEach(child => {
                 // Floor meshes are BoxGeometry with height = floorHeight
                 if (child.geometry && child.geometry.type === 'BoxGeometry' && 
                     child.geometry.parameters.height === floorHeight) {
+                    // Store the floor mesh with its x position for identification
                     floorMeshes.push({
                         mesh: child,
-                        startY: child.position.y
+                        startY: child.position.y,
+                        x: child.position.x, // Store X position to identify which building
+                        floorIndex: Math.round((child.position.y - floorBaseY) / normalFloorSpacing) // Calculate floor index
                     });
                 }
             });
@@ -1082,11 +1259,12 @@ const threejsTemplate = `<!DOCTYPE html>
             // Find floor labels
             scene.children.forEach(child => {
                 // Floor labels are PlaneGeometry with specific properties
-                if (child.geometry && child.geometry.type === 'PlaneGeometry' &&
-                    child.position.z === -12) {
+                if (child.geometry && child.geometry.type === 'PlaneGeometry') {
                     floorLabels.push({
                         mesh: child,
-                        startY: child.position.y
+                        startY: child.position.y,
+                        x: child.position.x, // Store X position to identify which building
+                        z: child.position.z
                     });
                 }
             });
@@ -1098,7 +1276,7 @@ const threejsTemplate = `<!DOCTYPE html>
                 // Easing function for smoother animation
                 const easedProgress = 1 - Math.pow(1 - progress, 3);
                 
-                // Update each floor's position and all its packages
+                // Update positions for left building (dependency levels)
                 buildingData.floors.forEach((floor, index) => {
                     const currentSpacing = normalFloorSpacing + (targetSpacing - normalFloorSpacing) * easedProgress;
                     const targetY = floorBaseY + index * currentSpacing;
@@ -1113,20 +1291,76 @@ const threejsTemplate = `<!DOCTYPE html>
                         }
                     });
                     
-                    // Move the floor mesh
-                    if (index < floorMeshes.length) {
-                        const floorMesh = floorMeshes[index];
+                    // Move the dependency building floor mesh
+                    const buildingOffset = -25; // Left building offset
+                    const leftBuildingFloors = floorMeshes.filter(floor => 
+                        Math.abs(floor.x - buildingOffset) < 5 && floor.floorIndex === index);
+                    
+                    if (leftBuildingFloors.length > 0) {
+                        const floorMesh = leftBuildingFloors[0];
                         const yOffset = (targetY - (floorBaseY + index * normalFloorSpacing));
                         floorMesh.mesh.position.y = floorMesh.startY + yOffset;
                         
                         // Also move the floor label if found
                         const labelIndex = floorLabels.findIndex(label => 
-                            Math.abs(label.startY - (floorMesh.startY + floorHeight/2 + 0.5)) < 0.1);
+                            Math.abs(label.x - buildingOffset) < 5 && 
+                            Math.abs(label.startY - (floorMesh.startY + floorHeight/2 + 0.5)) < 0.1 && 
+                            label.z < 0);
                         
                         if (labelIndex !== -1) {
                             floorLabels[labelIndex].mesh.position.y = 
                                 floorLabels[labelIndex].startY + yOffset;
                         }
+                    }
+                });
+                
+                // Update positions for right building (path depths)
+                // The right building is now using the reversedDepth, so we need
+                // to handle the explode view differently to maintain the correct ordering
+                
+                // Get all floor meshes of the right building
+                const buildingOffset = 25; // Right building offset
+                const rightBuildingFloors = floorMeshes.filter(floor => 
+                    Math.abs(floor.x - buildingOffset) < 5);
+                
+                // Sort by current position, bottom to top
+                rightBuildingFloors.sort((a, b) => a.startY - b.startY);
+                
+                // Apply the explode to each floor, maintaining the current order
+                rightBuildingFloors.forEach((floorMesh, index) => {
+                    const currentSpacing = normalFloorSpacing + (targetSpacing - normalFloorSpacing) * easedProgress;
+                    // Calculate target Y position based on current index in the sorted array
+                    const targetY = floorBaseY + index * currentSpacing;
+                    
+                    // Calculate Y offset from current to target position
+                    const origY = floorBaseY + index * normalFloorSpacing;
+                    const yOffset = targetY - origY;
+                    
+                    // Move the floor
+                    floorMesh.mesh.position.y = floorMesh.startY + yOffset;
+                    
+                    // Find all packages on this floor
+                    Object.keys(packageObjects).forEach(id => {
+                        const packageObj = packageObjects[id];
+                        // Check if this package is on the right building (x > 0) and on this floor
+                        // Note that we're comparing to the actual floor mesh position to find matching packages
+                        if (packageObj && packageObj.mesh.position.x > 0) {
+                            // If the package Y position is close to this floor's original position, move it
+                            if (Math.abs(startPositions[id].y - floorMesh.startY - floorHeight * 0.35) < floorHeight/2) {
+                                packageObj.mesh.position.y = startPositions[id].y + yOffset;
+                            }
+                        }
+                    });
+                    
+                    // Also move the floor label if found
+                    const labelIndex = floorLabels.findIndex(label => 
+                        Math.abs(label.x - buildingOffset) < 5 && 
+                        Math.abs(label.startY - (floorMesh.startY + floorHeight/2 + 0.5)) < 0.1 &&
+                        label.z < 0);
+                    
+                    if (labelIndex !== -1) {
+                        floorLabels[labelIndex].mesh.position.y = 
+                            floorLabels[labelIndex].startY + yOffset;
                     }
                 });
                 
@@ -1153,8 +1387,8 @@ const threejsTemplate = `<!DOCTYPE html>
         
         // Reset view
         function resetView() {
-            camera.position.set(20, 20, 20);
-            camera.lookAt(0, 0, 0);
+            camera.position.set(0, 70, 40); // Reset to top-down perspective with slight tilt, panned to bottom
+            camera.lookAt(0, 0, -10);
             controls.reset();
             
             // Reset floor group position
