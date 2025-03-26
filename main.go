@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/audi70r/uncle-bob/checker"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	AppVersion = "1.1.0"
+	AppVersion = "1.2.0"
 	AppAuthor  = "dmitri@nuage.ee"
 )
 
@@ -34,6 +35,7 @@ func main() {
 	fileImports := flag.String("package-imports", "", "Show detailed information about package imports")
 	strictFlag := flag.Bool("strict", false, "Do strict checking, allow only one level inward imports")
 	ignoreTests := flag.Bool("ignore-tests", false, "Ignore imports of test files")
+	pathFlag := flag.String("path", "", "Specify the path to analyze (default: current directory)")
 	quietFlag := flag.Bool("quiet", false, "Only show warnings and errors")
 	silentFlag := flag.Bool("silent", false, "Only show errors")
 	noColorFlag := flag.Bool("no-color", false, "Disable colored output")
@@ -45,6 +47,21 @@ func main() {
 	// Handle version flag
 	if *versionFlag {
 		fmt.Printf("Uncle Bob %s\n", AppVersion)
+		return
+	}
+
+	// Add custom help message
+	if len(os.Args) > 1 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
+		fmt.Println("Uncle Bob - Clean Architecture Dependency Checker")
+		fmt.Println("\nUsage:")
+		fmt.Println("  uncle-bob [options]")
+		fmt.Println("\nOptions:")
+		flag.PrintDefaults()
+		fmt.Println("\nExamples:")
+		fmt.Println("  uncle-bob                           # Check current directory")
+		fmt.Println("  uncle-bob -path=/path/to/project    # Check specific directory")
+		fmt.Println("  uncle-bob -strict                   # Use strict mode (only allows one level inward imports)")
+		fmt.Println("  uncle-bob -package-imports=\"pkg/foo\" # Show imports for a specific package")
 		return
 	}
 
@@ -65,11 +82,36 @@ func main() {
 		printLogo()
 	}
 
-	// Get working directory
-	workDir, err := os.Getwd()
-	if err != nil {
-		clog.Error(fmt.Sprintf("Failed to get working directory: %s", err.Error()))
-		os.Exit(1)
+	// Determine working directory (either specified path or current directory)
+	var workDir string
+	var err error
+
+	if *pathFlag != "" {
+		// Use the specified path
+		workDir, err = filepath.Abs(*pathFlag)
+		if err != nil {
+			clog.Error(fmt.Sprintf("Failed to resolve specified path: %s", err.Error()))
+			os.Exit(1)
+		}
+
+		// Verify the path exists
+		fileInfo, err := os.Stat(workDir)
+		if err != nil {
+			clog.Error(fmt.Sprintf("Path does not exist or is not accessible: %s", err.Error()))
+			os.Exit(1)
+		}
+
+		if !fileInfo.IsDir() {
+			clog.Error("Specified path is not a directory")
+			os.Exit(1)
+		}
+	} else {
+		// Use current working directory
+		workDir, err = os.Getwd()
+		if err != nil {
+			clog.Error(fmt.Sprintf("Failed to get working directory: %s", err.Error()))
+			os.Exit(1)
+		}
 	}
 
 	// Locate go.mod file
