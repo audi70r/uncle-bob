@@ -97,9 +97,28 @@ func CheckLevels(packageMap map[string]PackageInfo, packageLevels [][]string, st
 		}
 	}
 
-	// Print all violations
-	for _, v := range results {
-		clog.PrintColorMessage(v)
+	// If there are violations, display them with a header
+	if len(results) > 0 {
+		// Display a violations header
+		headerMsg := "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+		clog.PrintColorMessage(clog.NewInfo(headerMsg))
+
+		titleMsg := "┃  🚨 DEPENDENCY VIOLATIONS                             ┃"
+		clog.PrintColorMessage(clog.NewInfo(titleMsg))
+
+		footerMsg := "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+		clog.PrintColorMessage(clog.NewInfo(footerMsg))
+
+		// Print each violation with an enhanced visual format
+		for i, v := range results {
+			// Add a separator between violations
+			if i > 0 {
+				sepMsg := "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+				clog.PrintColorMessage(clog.NewInfo(sepMsg))
+			}
+
+			clog.PrintColorMessage(v)
+		}
 	}
 
 	return results
@@ -115,9 +134,16 @@ var CleanArchitectureLayers = []string{
 
 // LevelsInfo displays information about package levels with Clean Architecture context
 func LevelsInfo(packageLevels [][]string) {
-	// Show Clean Architecture layer info
+	// Show Clean Architecture layer info with a section header
 	if len(packageLevels) > 0 {
-		clog.Info("Clean Architecture Reference:")
+		headerMsg := "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+		clog.PrintColorMessage(clog.NewInfo(headerMsg))
+
+		titleMsg := "┃  🏛️  CLEAN ARCHITECTURE REFERENCE                     ┃"
+		clog.PrintColorMessage(clog.NewInfo(titleMsg))
+
+		footerMsg := "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+		clog.PrintColorMessage(clog.NewInfo(footerMsg))
 
 		// Calculate the maximum level we have, to map to Clean Architecture layers
 		maxLevels := len(packageLevels)
@@ -130,7 +156,22 @@ func LevelsInfo(packageLevels [][]string) {
 
 		// Print Clean Architecture layer guidance
 		for i, layer := range caLayers {
-			levelMsg := fmt.Sprintf("Level %d ~ %s", i, layer)
+			// Use different symbols for each layer to visually distinguish them
+			var layerSymbol string
+			switch i {
+			case 0:
+				layerSymbol = "🌐" // UI/Web/External interfaces
+			case 1:
+				layerSymbol = "🔌" // Adapters/Controllers
+			case 2:
+				layerSymbol = "⚙️" // Use Cases/Application logic
+			case 3:
+				layerSymbol = "📦" // Entities/Domain models
+			default:
+				layerSymbol = "•"
+			}
+
+			levelMsg := fmt.Sprintf("%s Level %d ~ %s", layerSymbol, i, layer)
 			indentedResult := clog.NewInfo(levelMsg).WithIndent(1)
 			clog.PrintColorMessage(indentedResult)
 		}
@@ -138,8 +179,16 @@ func LevelsInfo(packageLevels [][]string) {
 		clog.Info("")
 	}
 
-	// Display actual package levels
-	clog.Info("Package Levels:")
+	// Display actual package levels with a nice header
+	headerMsg := "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+	clog.PrintColorMessage(clog.NewInfo(headerMsg))
+
+	titleMsg := "┃  📊 PACKAGE DEPENDENCY LEVELS                        ┃"
+	clog.PrintColorMessage(clog.NewInfo(titleMsg))
+
+	footerMsg := "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+	clog.PrintColorMessage(clog.NewInfo(footerMsg))
+
 	for lvl, packageLevel := range packageLevels {
 		if len(packageLevel) == 0 {
 			continue
@@ -151,7 +200,29 @@ func LevelsInfo(packageLevels [][]string) {
 			layerInfo = fmt.Sprintf(" ~ %s", CleanArchitectureLayers[lvl])
 		}
 
-		msg := fmt.Sprintf("Level %d%s packages:", lvl, layerInfo)
+		// Use a visual separator between levels
+		if lvl > 0 {
+			separatorMsg := "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+			sepResult := clog.NewInfo(separatorMsg)
+			clog.PrintColorMessage(sepResult)
+		}
+
+		// Add emoji for the level to make it visually distinct
+		var levelEmoji string
+		switch lvl {
+		case 0:
+			levelEmoji = "🔝" // Top level
+		case 1:
+			levelEmoji = "🔼" // High level
+		case 2:
+			levelEmoji = "⏺️" // Mid level
+		case 3:
+			levelEmoji = "🔽" // Low level
+		default:
+			levelEmoji = "⏬" // Lowest levels
+		}
+
+		msg := fmt.Sprintf("%s Level %d%s packages:", levelEmoji, lvl, layerInfo)
 		result := clog.NewInfo(msg)
 		clog.PrintColorMessage(result)
 
@@ -160,15 +231,19 @@ func LevelsInfo(packageLevels [][]string) {
 			// Clean up the package string for display
 			cleanPkg := strings.Trim(packageImport, `"`)
 
-			// Determine package type label
+			// Determine package type label and icon
 			packageLabel := ""
+			packageIcon := "└─"
+
 			if isEntryPointPackage(packageImport) {
 				packageLabel = " (entry point)"
+				packageIcon = "🚪"
 			} else if isUtilityPackage(packageImport) {
 				packageLabel = " (utility)"
+				packageIcon = "🔧"
 			}
 
-			pkgMsg := fmt.Sprintf("- %s%s", cleanPkg, packageLabel)
+			pkgMsg := fmt.Sprintf("%s %s%s", packageIcon, cleanPkg, packageLabel)
 			indentedResult := clog.NewInfo(pkgMsg).WithIndent(1)
 			clog.PrintColorMessage(indentedResult)
 		}
@@ -179,8 +254,15 @@ func LevelsInfo(packageLevels [][]string) {
 func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []clog.CheckResult {
 	var results []clog.CheckResult
 
-	// Display package name
-	clog.Info(fmt.Sprintf("Package: %s", packageName))
+	// Display package name with a nice header
+	headerMsg := "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+	results = append(results, clog.NewInfo(headerMsg))
+
+	titleMsg := fmt.Sprintf("┃  📦 PACKAGE DETAIL: %-36s ┃", packageName)
+	results = append(results, clog.NewInfo(titleMsg))
+
+	footerMsg := "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+	results = append(results, clog.NewInfo(footerMsg))
 
 	// Get package directory
 	packagePath := workdir + strings.TrimPrefix(packageName, ModPath)
@@ -224,22 +306,31 @@ func DisplayPackageInfo(workdir string, packageName string, ignoreTests bool) []
 		}
 
 		// Display file information
-		fileMsg := fmt.Sprintf("File: %s", info.Name())
+		fileMsg := fmt.Sprintf("📄 File: %s", info.Name())
 		results = append(results, clog.NewInfo(fileMsg))
 
 		// Display imports with indentation
 		if len(fileImports) > 0 {
-			importMsg := "Imports:"
+			importMsg := "⤵️ Imports:"
 			results = append(results, clog.NewInfo(importMsg).WithIndent(1))
 
 			for _, fileImport := range fileImports {
+				// Check if it's a project import and add special visual
+				importIcon := "└─"
+				if strings.Index(fileImport, ModPath) > 0 {
+					importIcon = "🔗"
+				}
+
 				results = append(results,
-					clog.NewInfo(fmt.Sprintf("- %s", fileImport)).WithIndent(2))
+					clog.NewInfo(fmt.Sprintf("%s %s", importIcon, fileImport)).WithIndent(2))
 			}
 		} else {
 			results = append(results,
 				clog.NewInfo("No imports").WithIndent(1))
 		}
+
+		// Add a small separator between files
+		results = append(results, clog.NewInfo("┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
 
 		return nil
 	})

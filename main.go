@@ -149,13 +149,21 @@ func main() {
 	// Check for violations
 	results = checker.CheckLevels(packageMap, packageLevels, *strictFlag)
 
-	// Output final result
+	// Output final result with visual formatting
 	if checker.HasViolations(results) {
-		clog.Error("Issues detected, Uncle Bob is Sad :(")
-		clog.Info("\nReview the suggestions above to fix architectural issues.")
-		clog.Info("For Clean Architecture principles, visit: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html")
+		// Display a visually prominent error box
+		clog.Info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓")
+		clog.Error("┃  ⚠️  ARCHITECTURE VIOLATIONS DETECTED                   ┃")
+		clog.Info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛")
+
+		clog.Info("\n📋 Review the suggestions above to fix architectural issues.")
+		clog.Info("📚 Learn more about Clean Architecture at: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html")
 		os.Exit(1)
 	} else {
-		clog.Info("Well done, Uncle Bob is Proud :)")
+		// Display a visually prominent success box
+		clog.Info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓")
+		clog.Info("┃  ✅ ARCHITECTURE CHECK PASSED                           ┃")
+		clog.Info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛")
+		clog.Info("Well done, Uncle Bob is Proud! Your code follows Clean Architecture patterns.")
 	}
 }
