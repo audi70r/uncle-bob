@@ -670,37 +670,26 @@ const threejsTemplate = `<!DOCTYPE html>
                     // Calculate path depth based on the number of "/" in the package path
                     // First, remove any leading protocol or domain parts like "github.com/"
                     let cleanPath = pkg.name;
-                    // Remove module path prefix if present
-                    if (cleanPath.includes('/')) {
-                        // Find the first directory level
-                        const firstSlashIndex = cleanPath.indexOf('/');
-                        if (firstSlashIndex > 0) {
-                            // Get just the path part after module prefix
-                            const parts = cleanPath.split('/');
-                            // Count remaining path components (subtract 3 for typical GitHub paths)
-                            const pathDepth = Math.max(0, parts.length - 3);
-                            maxPathDepth = Math.max(maxPathDepth, pathDepth);
-                            
-                            if (!pathDepthMap[pathDepth]) {
-                                pathDepthMap[pathDepth] = [];
-                            }
-                            
-                            // Copy the package data with adjusted position
-                            pathDepthMap[pathDepth].push({
-                                ...pkg,
-                                pathDepth: pathDepth
-                            });
-                        }
-                    } else {
-                        // If no slashes (root package), put it at depth 0
-                        if (!pathDepthMap[0]) {
-                            pathDepthMap[0] = [];
-                        }
-                        pathDepthMap[0].push({
-                            ...pkg,
-                            pathDepth: 0
-                        });
+                    // Count the number of path segments for depth
+                    const parts = cleanPath.split('/');
+                    // Calculate depth based on number of path segments
+                    const pathDepth = Math.max(0, parts.length - 1); // -1 because we don't count the root
+                    
+                    // Skip depth 0 (root packages)
+                    if (pathDepth === 0) return;
+                    
+                    maxPathDepth = Math.max(maxPathDepth, pathDepth);
+                    
+                    // Always ensure the array exists for this depth
+                    if (!pathDepthMap[pathDepth]) {
+                        pathDepthMap[pathDepth] = [];
                     }
+                    
+                    // Copy the package data with adjusted position
+                    pathDepthMap[pathDepth].push({
+                        ...pkg,
+                        pathDepth: pathDepth
+                    });
                 });
             });
             
@@ -708,16 +697,16 @@ const threejsTemplate = `<!DOCTYPE html>
             // Deeper paths should be at the bottom, like utilities in the dependency building
             
             // Check if we have any packages at all depths
-            for (let i = 0; i <= maxPathDepth; i++) {
+            for (let i = 1; i <= maxPathDepth; i++) { // Start from 1 to skip root
                 if (!pathDepthMap[i]) {
                     pathDepthMap[i] = [];
                 }
             }
             
-            // Reverse the floors - depth 0 will be at the top, maxDepth at the bottom
-            for (let depth = 0; depth <= maxPathDepth; depth++) {
+            // Reverse the floors - depth 1 will be at the top, maxDepth at the bottom
+            for (let depth = 1; depth <= maxPathDepth; depth++) { // Start from 1 to skip root
                 const packages = pathDepthMap[depth] || [];
-                if (packages.length === 0 && depth > 0) continue; // Always show level 0, even if empty
+                if (packages.length === 0) continue; // Skip empty levels
                 
                 // Calculate reversed position - deeper paths at the bottom
                 // This maps depth 0 to the top floor and maxDepth to the bottom floor
@@ -742,7 +731,7 @@ const threejsTemplate = `<!DOCTYPE html>
                 
                 // Add floor label for path structure (showing reversed)
                 // Use the actual depth number, but the position is reversed
-                const labelText = "Path Depth " + depth + (depth === 0 ? " (Root)" : (depth === maxPathDepth ? " (Deepest)" : ""));
+                const labelText = "Path Depth " + depth + (depth === maxPathDepth ? " (Deepest)" : "");
                 addFloorLabel(labelText, reversedDepth, floorY + floorHeight/2 + 0.5, building2OffsetX, -12);
                 
                 // Calculate grid layout for packages
